@@ -1,4 +1,6 @@
 import * as React from "react"
+import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import { CalendarDays, ClipboardList, Plus, Trash2, Truck } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -21,6 +23,7 @@ const newLine = (): Line => ({ id: `L-${++lineSeq}`, sku: "", qty: 1, cost: 0 })
 
 export default function NewPO() {
   useAutoMarkStep("first-po")
+  const navigate = useNavigate()
   const [lines, setLines] = React.useState<Line[]>([newLine()])
   const [submitting, setSubmitting] = React.useState(false)
   const { formatPrice, symbol } = useCurrency()
@@ -47,7 +50,18 @@ export default function NewPO() {
         </>
       }
       backHref="/purchasing/pos"
-      onSubmit={() => { setSubmitting(true); setTimeout(() => setSubmitting(false), 500) }}
+      onSubmit={() => {
+        if (lines.some((l) => !l.sku || l.qty <= 0)) {
+          toast.error("Add at least one line with SKU and quantity.")
+          return
+        }
+        setSubmitting(true)
+        setTimeout(() => {
+          setSubmitting(false)
+          toast.success("Purchase order created", { description: `${lines.length} line${lines.length === 1 ? "" : "s"} · ${formatPrice(total)}` })
+          navigate("/purchasing/pos")
+        }, 500)
+      }}
       aside={
         <FormAside title="Summary">
           <dl className="space-y-2 text-sm">

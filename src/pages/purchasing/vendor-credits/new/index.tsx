@@ -1,4 +1,6 @@
 import * as React from "react"
+import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import { CalendarDays, FileMinus, Wallet } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -14,6 +16,7 @@ import { SwitchField } from "@/components/forms/switch-field"
 import { useCurrency, formatPriceFor } from "@/contexts/currency"
 
 export default function NewVendorCredit() {
+  const navigate = useNavigate()
   const [submitting, setSubmitting] = React.useState(false)
   const { symbol } = useCurrency()
   return (
@@ -30,7 +33,14 @@ export default function NewVendorCredit() {
         </>
       }
       backHref="/purchasing/vendor-credits"
-      onSubmit={() => { setSubmitting(true); setTimeout(() => setSubmitting(false), 500) }}
+      onSubmit={() => {
+        setSubmitting(true)
+        setTimeout(() => {
+          setSubmitting(false)
+          toast.success("Vendor credit saved", { description: "It'll be applied automatically to the vendor's next bill." })
+          navigate("/purchasing/vendor-credits")
+        }, 500)
+      }}
       aside={
         <FormAside
           tips={[

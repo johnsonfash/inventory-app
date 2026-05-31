@@ -4,6 +4,7 @@ import {
   Building2,
   ChevronRight,
   Clock,
+  Loader2,
   Mail,
   Package,
   Phone,
@@ -89,6 +90,7 @@ export default function Vendors() {
   const [tab, setTab] = React.useState<StatusFilter>("all")
   const [vendors, setVendors] = React.useState<Vendor[]>(SEED_VENDORS)
   const [addOpen, setAddOpen] = React.useState(false)
+  const [refreshing, setRefreshing] = React.useState(false)
 
   // Quick-add prepends to the roster. Builds a full Vendor row from the
   // minimal overlay fields with sensible "brand-new vendor" defaults
@@ -115,7 +117,10 @@ export default function Vendors() {
   }
 
   useRegisterPageRefresh(
-    React.useCallback(async () => { await new Promise((r) => setTimeout(r, 350)) }, []),
+    React.useCallback(async () => {
+      setRefreshing(true)
+      try { await new Promise((r) => setTimeout(r, 350)) } finally { setRefreshing(false) }
+    }, []),
   )
 
   const filtered = React.useMemo(() => {
@@ -158,7 +163,7 @@ export default function Vendors() {
         <OnboardingNudge stepKey="connect-payment" />
 
         {/* KPI ribbon */}
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+        <div className={`grid grid-cols-2 gap-3 transition-opacity md:grid-cols-4 md:gap-4 ${refreshing ? "opacity-60" : ""}`}>
           <Kpi Icon={Building2} label="Vendors" value={totalVendors.toString()} tone="brand" />
           <Kpi Icon={Wallet} label="YTD spend" value={formatPrice(ytdSpend)} tone="success" />
           <Kpi Icon={Package} label="Open POs" value={openPOs.toString()} tone="info" hint={openPOs > 0 ? "Awaiting receipt" : "Nothing in flight"} />
@@ -189,6 +194,11 @@ export default function Vendors() {
               className="pl-9"
             />
           </div>
+          {refreshing && (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Refreshing…
+            </span>
+          )}
           <Button className="hidden md:inline-flex" onClick={() => setAddOpen(true)}>
             <Plus className="h-4 w-4" /> Add vendor
           </Button>

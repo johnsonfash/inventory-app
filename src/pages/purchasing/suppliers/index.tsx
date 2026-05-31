@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Link } from "react-router-dom"
-import { Building2, ChevronRight, Mail, Phone, Plus, Search } from "lucide-react"
+import { Building2, ChevronRight, Loader2, Mail, Phone, Plus, Search } from "lucide-react"
 import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -53,9 +53,15 @@ function avatarTint(name: string) {
 export default function Suppliers() {
   const isMobile = useIsMobile()
   const [query, setQuery] = React.useState("")
+  const [refreshing, setRefreshing] = React.useState(false)
   const { formatPrice } = useCurrency()
 
-  useRegisterPageRefresh(React.useCallback(async () => { await new Promise((r) => setTimeout(r, 400)) }, []))
+  useRegisterPageRefresh(
+    React.useCallback(async () => {
+      setRefreshing(true)
+      try { await new Promise((r) => setTimeout(r, 400)) } finally { setRefreshing(false) }
+    }, []),
+  )
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -99,6 +105,11 @@ export default function Suppliers() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search supplier by name, email, or category…" className="pl-9" />
           </div>
+          {refreshing && (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Refreshing…
+            </span>
+          )}
           <Link to="/purchasing/vendors/new" className="hidden md:inline-flex">
             <Button><Plus className="h-4 w-4" /> Add supplier</Button>
           </Link>

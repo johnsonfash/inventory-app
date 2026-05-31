@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Filter,
+  Loader2,
   Plus,
   Search,
   Truck,
@@ -97,6 +98,7 @@ export default function PurchaseOrders() {
   const [filterOpen, setFilterOpen] = React.useState(false)
   const [statuses, setStatuses] = React.useState<POStatus[]>([])
   const [stagedStatuses, setStagedStatuses] = React.useState<POStatus[]>([])
+  const [refreshing, setRefreshing] = React.useState(false)
   const { formatPrice } = useCurrency()
 
   React.useEffect(() => {
@@ -105,7 +107,8 @@ export default function PurchaseOrders() {
 
   useRegisterPageRefresh(
     React.useCallback(async () => {
-      await new Promise((r) => setTimeout(r, 400))
+      setRefreshing(true)
+      try { await new Promise((r) => setTimeout(r, 400)) } finally { setRefreshing(false) }
     }, []),
   )
 
@@ -157,7 +160,12 @@ export default function PurchaseOrders() {
     >
       <div className="flex flex-col gap-4">
         <OnboardingNudge stepKey="first-po" cta="Create first PO" />
-        <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1 scrollbar-hide snap-x snap-mandatory md:mx-0 md:grid md:grid-cols-4 md:gap-3 md:overflow-visible md:px-0">
+        <div
+          className={cn(
+            "-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1 scrollbar-hide snap-x snap-mandatory md:mx-0 md:grid md:grid-cols-4 md:gap-3 md:overflow-visible md:px-0 transition-opacity",
+            refreshing && "opacity-60",
+          )}
+        >
           {[
             { label: "Open POs", value: String(openCount), tone: "info" as StatusTone, hint: "awaiting" },
             { label: "Overdue", value: String(overdueCount), tone: "danger" as StatusTone, hint: "act now" },
@@ -190,6 +198,11 @@ export default function PurchaseOrders() {
           <Button variant="outline" className="hidden md:inline-flex" onClick={() => setFilterOpen(true)}>
             <Filter className="h-4 w-4" /> Filters {appliedCount ? `(${appliedCount})` : ""}
           </Button>
+          {refreshing && (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Refreshing…
+            </span>
+          )}
           <Link to="/purchasing/pos/new" className="hidden md:inline-flex">
             <Button>
               <Plus className="h-4 w-4" /> New PO

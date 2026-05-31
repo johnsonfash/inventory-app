@@ -1,4 +1,6 @@
 import * as React from "react"
+import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import { CalendarDays, Paperclip, Receipt, Wallet } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -13,6 +15,7 @@ import { InputAddon } from "@/components/forms/input-addon"
 import { SwitchField } from "@/components/forms/switch-field"
 
 export default function NewBill() {
+  const navigate = useNavigate()
   const [submitting, setSubmitting] = React.useState(false)
   return (
     <FormShell
@@ -27,7 +30,14 @@ export default function NewBill() {
         </>
       }
       backHref="/purchasing/bills"
-      onSubmit={() => { setSubmitting(true); setTimeout(() => setSubmitting(false), 500) }}
+      onSubmit={() => {
+        setSubmitting(true)
+        setTimeout(() => {
+          setSubmitting(false)
+          toast.success("Bill saved", { description: "Added to AP aging — Pallio reminds you before it's due." })
+          navigate("/purchasing/bills")
+        }, 500)
+      }}
       aside={
         <FormAside
           tips={[

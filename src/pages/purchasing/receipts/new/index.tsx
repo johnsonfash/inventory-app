@@ -1,4 +1,6 @@
 import * as React from "react"
+import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import { Box, CalendarDays, FileCheck, Truck } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,6 +14,7 @@ import { FormAside } from "@/components/forms/form-aside"
 import { SwitchField } from "@/components/forms/switch-field"
 
 export default function NewReceipt() {
+  const navigate = useNavigate()
   const [submitting, setSubmitting] = React.useState(false)
   return (
     <FormShell
@@ -26,7 +29,14 @@ export default function NewReceipt() {
         </>
       }
       backHref="/purchasing/receipts"
-      onSubmit={() => { setSubmitting(true); setTimeout(() => setSubmitting(false), 500) }}
+      onSubmit={() => {
+        setSubmitting(true)
+        setTimeout(() => {
+          setSubmitting(false)
+          toast.success("Receipt saved", { description: "On-hand stock and PO status updated." })
+          navigate("/purchasing/receipts")
+        }, 500)
+      }}
       aside={
         <FormAside
           tips={[

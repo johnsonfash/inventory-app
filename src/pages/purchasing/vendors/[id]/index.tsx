@@ -24,6 +24,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
 import { EmptyState } from "@/components/lists/empty-state"
 import { Avatar } from "@/components/avatar"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useCurrency } from "@/contexts/currency"
 import { toast } from "sonner"
@@ -102,6 +103,8 @@ export default function VendorDetail() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
   const { formatPrice } = useCurrency()
+  const [confirmDelete, setConfirmDelete] = React.useState(false)
+  const [deleting, setDeleting] = React.useState(false)
 
   const vendor = VENDORS.find((v) => v.slug === id)
 
@@ -140,8 +143,37 @@ export default function VendorDetail() {
     window.open(`https://wa.me/${num}`, "_blank")
   }
   const onEdit = () => navigate(`/purchasing/vendors/${vendor.slug}/edit`)
-  const onDelete = () => toast("Delete will land with the backend.")
-  const onExport = () => toast("CSV export lands with the backend.")
+  const onDelete = () => setConfirmDelete(true)
+  const confirmDeleteVendor = async () => {
+    setDeleting(true)
+    try {
+      await new Promise((r) => setTimeout(r, 400))
+      toast.success(`${vendor.name} deleted`, { description: "Purchase order history is preserved." })
+      setConfirmDelete(false)
+      navigate("/purchasing/vendors")
+    } catch {
+      toast.error("Couldn't delete vendor. Try again.")
+    } finally {
+      setDeleting(false)
+    }
+  }
+  const onExport = () => {
+    // Build a CSV of the PO history right in the browser so the
+    // download is real even before the backend exports endpoint lands.
+    const header = ["PO", "Date", "Items", "Total", "Status", "ETA"]
+    const lines = pos.map((p) => [p.id, p.date, p.items, p.total, p.status, p.eta])
+    const csv = [header, ...lines].map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${vendor.slug}-po-history.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    toast.success("CSV downloaded", { description: `${pos.length} purchase orders exported.` })
+  }
   const onNewPO = () => navigate(`/purchasing/pos/new?vendor=${vendor.slug}`)
 
   return (
@@ -334,6 +366,23 @@ export default function VendorDetail() {
           </button>
         </div>
       </div>
+
+      <Dialog open={confirmDelete} onOpenChange={(v) => !deleting && setConfirmDelete(v)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {vendor.name}?</DialogTitle>
+            <DialogDescription>
+              Their contact record will be removed. Past purchase orders, bills, and credits stay on the books for auditing.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDelete(false)} disabled={deleting}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmDeleteVendor} disabled={deleting}>
+              {deleting ? "Deleting…" : "Delete vendor"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   )
 }

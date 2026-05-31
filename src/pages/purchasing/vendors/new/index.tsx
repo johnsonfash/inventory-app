@@ -1,4 +1,6 @@
 import * as React from "react"
+import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import { Building2, CreditCard, MapPin, Tag } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,6 +14,7 @@ import { FormAside } from "@/components/forms/form-aside"
 import { InputAddon } from "@/components/forms/input-addon"
 
 export default function NewVendor() {
+  const navigate = useNavigate()
   const [submitting, setSubmitting] = React.useState(false)
 
   return (
@@ -28,7 +31,11 @@ export default function NewVendor() {
       backHref="/purchasing/vendors"
       onSubmit={() => {
         setSubmitting(true)
-        setTimeout(() => setSubmitting(false), 600)
+        setTimeout(() => {
+          setSubmitting(false)
+          toast.success("Vendor saved", { description: "Pre-fills will apply to their next PO." })
+          navigate("/purchasing/vendors")
+        }, 600)
       }}
       aside={
         <FormAside
