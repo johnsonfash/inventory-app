@@ -16,6 +16,7 @@ import {
   LineChart,
   Package,
   PackageMinus,
+  PackagePlus,
   PiggyBank,
   Receipt,
   Sparkles,
@@ -69,6 +70,7 @@ const GROUPS: { title: string; description: string; cards: ReportCard[] }[] = [
     description: "Stock health, expiry, and item movement",
     cards: [
       { href: "/reporting/stock", title: "Stock", description: "On-hand and value by item", metric: formatPriceCompact(182000), delta: "+1.1%", trend: "up", Icon: Boxes, tone: "violet", spark: [42, 44, 43, 46, 47, 49, 50] },
+      { href: "/reporting/reorder", title: "Reorder", description: "What to buy today, grouped by supplier", metric: "12 items", delta: "+3", trend: "up", Icon: PackagePlus, tone: "amber", spark: [6, 7, 8, 9, 10, 11, 12] },
       { href: "/reporting/stock-expiry", title: "Stock Expiry", description: "Items expiring soon", metric: "14 items", delta: "−3", trend: "down", Icon: PackageMinus, tone: "rose", spark: [22, 20, 19, 17, 16, 15, 14] },
       { href: "/reporting/stock-adjustment", title: "Stock Adjustments", description: "Manual reconciliations", metric: "23 entries", Icon: Package, tone: "amber", spark: [3, 5, 4, 6, 5, 7, 6] },
       { href: "/reporting/item", title: "Items", description: "Per-item full statistics", metric: "1,284 SKUs", Icon: ClipboardList, tone: "sky", spark: [12, 13, 13, 14, 15, 15, 16] },

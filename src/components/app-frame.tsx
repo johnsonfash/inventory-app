@@ -4,6 +4,7 @@ import { motion } from "framer-motion"
 import { Box, ChevronDown, Loader2, PackagePlus, Plus, Search, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { OrgLocationSwitch } from "@/components/org-location-switch"
+import { LocationScopePill } from "@/components/location-scope-pill"
 import { AppSidebar } from "@/components/app-sidebar"
 import { MobileTopBar } from "@/components/mobile/mobile-top-bar"
 import { MobileBottomNav } from "@/components/mobile/mobile-bottom-nav"
@@ -66,6 +67,13 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
     // side-by-side. gap-1.5 (6px) was too tight; the bell ended up
     // crowding the avatar.
     <div className="flex items-center gap-2">
+      {/* Mobile scope pill — compact variant so it doesn't crowd
+          the page title. Same hook as the desktop pill so flipping
+          either updates the other live. Drives report + dashboard
+          + sales-list scope; the POS is intentionally NOT scoped
+          here (it stays bound to the clocked-in location via
+          useOrgLocation). */}
+      <LocationScopePill variant="compact" />
       <button
         type="button"
         onClick={() => openPalette(true)}
@@ -141,6 +149,12 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
           </h1>
           <div className="ml-auto flex items-center gap-1.5 md:gap-2">
             <OrgLocationSwitch />
+            {/* Global view-scope pill. Sits next to OrgLocationSwitch
+                because they're a related pair: the OrgLocationSwitch
+                says "who am I and where am I sitting" (binds the POS),
+                this one says "which locations am I LOOKING AT in
+                reports + dashboards". Independent on purpose. */}
+            <LocationScopePill />
             {/* Command-palette trigger. Two presentations:
                 - md-lg (768–1023): icon-only button — saves ~240px of
                   header width so the avatar doesn't clip on narrow
