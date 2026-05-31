@@ -1,5 +1,6 @@
 
 import * as React from "react"
+import { toast } from "sonner"
 import { PageShell } from "@/components/page-shell"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -34,7 +35,12 @@ export default function MarketingCommissionsPage() {
           )
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        if (ignore) return
+        // Local POS aggregate still renders — we just warn the user so
+        // they know the live API failed and the numbers may be stale.
+        toast.error("Couldn't load latest team analytics", { description: "Showing local sales data." })
+      })
     return () => {
       ignore = true
     }

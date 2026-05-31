@@ -1,4 +1,6 @@
 import * as React from "react"
+import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import {
   AppWindow,
   Facebook,
@@ -65,10 +67,12 @@ const TONES = {
 type Media = { url: string; name: string; kind: "image" | "video" }
 
 export default function NewListing() {
+  const navigate = useNavigate()
   const { symbol, formatPrice } = useCurrency()
   const catalog = React.useMemo(() => loadAllCatalog(), [])
 
   const [submitting, setSubmitting] = React.useState(false)
+  const [dragKind, setDragKind] = React.useState<Media["kind"] | null>(null)
   const [subject, setSubject] = React.useState<Subject>("product")
   const [sku, setSku] = React.useState(catalog[0]?.sku ?? "")
   const [title, setTitle] = React.useState("")
@@ -128,13 +132,30 @@ export default function NewListing() {
         </>
       }
       backHref="/marketing"
-      onSubmit={() => { setSubmitting(true); setTimeout(() => setSubmitting(false), 600) }}
+      onSubmit={() => {
+        setSubmitting(true)
+        // Mock persistence — real backend will POST to /listings.
+        // We still confirm success + send the user back to the marketing
+        // hub so they can see the listing appear in the per-channel views.
+        setTimeout(() => {
+          setSubmitting(false)
+          toast.success(`Published to ${enabledCount} ${enabledCount === 1 ? "channel" : "channels"}`)
+          navigate("/marketing")
+        }, 600)
+      }}
       aside={<PreviewAside subjectCta={subjectDef.cta} title={previewTitle} image={previewImage} priceLabel={price && !Number.isNaN(priceNum) ? formatPrice(priceNum) : undefined} channels={enabledChannels.map((c) => ({ key: c.key, label: c.label }))} hasVideo={media.some((m) => m.kind === "video")} />}
       footer={
         <FormFooter
           submitLabel={`Publish to ${enabledCount} ${enabledCount === 1 ? "channel" : "channels"}`}
           submitting={submitting}
           submitDisabled={enabledCount === 0 || !previewTitle.trim()}
+          submitTooltip={
+            enabledCount === 0
+              ? "Select at least one channel"
+              : !previewTitle.trim()
+                ? "Add a headline first"
+                : undefined
+          }
           cancelHref="/marketing"
         />
       }
@@ -209,14 +230,30 @@ export default function NewListing() {
                 </button>
               </div>
             ))}
-            <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border bg-background text-muted-foreground transition-colors hover:border-brand/40">
+            <label
+              onDragOver={(e) => { e.preventDefault(); setDragKind("image") }}
+              onDragLeave={() => setDragKind(null)}
+              onDrop={(e) => { e.preventDefault(); setDragKind(null); addFiles(e.dataTransfer.files, "image") }}
+              className={cn(
+                "flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed bg-background text-muted-foreground transition-colors hover:border-brand/40",
+                dragKind === "image" ? "border-brand bg-brand-soft text-brand dark:border-primary dark:bg-primary/15 dark:text-primary" : "border-border",
+              )}
+            >
               <Plus className="h-5 w-5" />
-              <span className="text-[10px]">Image</span>
+              <span className="text-[10px]">{dragKind === "image" ? "Drop here" : "Image"}</span>
               <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => addFiles(e.target.files, "image")} />
             </label>
-            <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border bg-background text-muted-foreground transition-colors hover:border-brand/40">
+            <label
+              onDragOver={(e) => { e.preventDefault(); setDragKind("video") }}
+              onDragLeave={() => setDragKind(null)}
+              onDrop={(e) => { e.preventDefault(); setDragKind(null); addFiles(e.dataTransfer.files, "video") }}
+              className={cn(
+                "flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed bg-background text-muted-foreground transition-colors hover:border-brand/40",
+                dragKind === "video" ? "border-brand bg-brand-soft text-brand dark:border-primary dark:bg-primary/15 dark:text-primary" : "border-border",
+              )}
+            >
               <Video className="h-5 w-5" />
-              <span className="text-[10px]">Video</span>
+              <span className="text-[10px]">{dragKind === "video" ? "Drop here" : "Video"}</span>
               <input type="file" accept="video/*" className="hidden" onChange={(e) => addFiles(e.target.files, "video")} />
             </label>
           </div>

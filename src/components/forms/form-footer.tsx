@@ -10,6 +10,9 @@ type Props = {
   submitDisabled?: boolean
   /** Show a spinner / "Saving…" label on the primary action. */
   submitting?: boolean
+  /** Native title attribute on the submit button — handy for explaining
+   *  why a disabled submit can't be clicked yet. */
+  submitTooltip?: string
   /** Cancel destination. Defaults to history back. */
   cancelHref?: string
   /** Hide the Cancel button entirely. */
@@ -25,6 +28,7 @@ export function FormFooter({
   submitLabel = "Save",
   submitDisabled,
   submitting,
+  submitTooltip,
   cancelHref,
   hideCancel,
   leading,
@@ -52,7 +56,7 @@ export function FormFooter({
             Cancel
           </Button>
         )}
-        <Button type="submit" disabled={submitDisabled || submitting}>
+        <Button type="submit" disabled={submitDisabled || submitting} title={submitTooltip}>
           {submitting ? "Saving…" : submitLabel}
         </Button>
       </div>

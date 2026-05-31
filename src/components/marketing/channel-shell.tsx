@@ -97,11 +97,23 @@ export function ChannelShell({ title, description, titleTooltip, Icon, tone, cam
             </div>
             <div className="flex items-center gap-2">
               {newListingHref && (
-                <Link to={newListingHref}>
-                  <Button variant="outline" disabled={!providerConnected}>
+                providerConnected ? (
+                  <Link to={newListingHref}>
+                    <Button variant="outline">
+                      <Plus className="h-4 w-4" /> New listing
+                    </Button>
+                  </Link>
+                ) : (
+                  <Button
+                    variant="outline"
+                    disabled
+                    aria-disabled
+                    title={`Connect ${title} first to create listings`}
+                    className="opacity-50"
+                  >
                     <Plus className="h-4 w-4" /> New listing
                   </Button>
-                </Link>
+                )
               )}
               {providerConnected ? (
                 <Link to={newCampaignHref}>

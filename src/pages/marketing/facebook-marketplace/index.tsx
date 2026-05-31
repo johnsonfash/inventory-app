@@ -155,11 +155,15 @@ export default function FacebookMarketplace() {
               <span className="text-right">Messages</span>
               <span>Status</span>
             </div>
+            {/* Rows are read-only — performance snapshot only. We mark
+                them with cursor-default so users don't try to tap and
+                wonder why nothing happens. Real edit actions live on
+                Facebook itself; Pallio just mirrors the analytics. */}
             <ul className="divide-y divide-border">
               {listings.map((l) => (
                 <li
                   key={l.id}
-                  className="grid items-center gap-3 p-3 md:grid-cols-[2fr_1fr_1fr_1fr_1fr]"
+                  className="grid cursor-default items-center gap-3 p-3 md:grid-cols-[2fr_1fr_1fr_1fr_1fr]"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">{l.title}</p>

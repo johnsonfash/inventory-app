@@ -1,4 +1,6 @@
 import * as React from "react"
+import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import { CalendarDays, Megaphone, Target, Users, type LucideIcon } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -32,6 +34,7 @@ type Props = {
 }
 
 export function CampaignShell({ channel, Icon, backHref, kind, providerId }: Props) {
+  const navigate = useNavigate()
   const [submitting, setSubmitting] = React.useState(false)
   const providerConnected = providerId ? getStatus(providerId) === "connected" : true
 
@@ -45,9 +48,23 @@ export function CampaignShell({ channel, Icon, backHref, kind, providerId }: Pro
       }
       backHref={backHref}
       onSubmit={() => {
-        if (!providerConnected) return
+        if (!providerConnected) {
+          toast.error(`Connect ${channel} first`, { description: "Your draft is saved — connect the provider to publish." })
+          return
+        }
         setSubmitting(true)
-        setTimeout(() => setSubmitting(false), 500)
+        // Mock persistence — real backend would POST here. We still confirm
+        // success so the user gets clear feedback + ends up back on the
+        // channel page where the new entry would appear in the list.
+        setTimeout(() => {
+          setSubmitting(false)
+          toast.success(
+            kind === "campaign"
+              ? `${channel} campaign launched`
+              : `${channel} listing saved`,
+          )
+          navigate(backHref)
+        }, 500)
       }}
       aside={
         <FormAside

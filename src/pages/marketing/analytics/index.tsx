@@ -112,7 +112,11 @@ export default function MarketingAnalytics() {
           <div className="inline-flex gap-1 rounded-lg border border-border p-0.5">
             {PERIODS.map((p) => (
               <button key={p} type="button" onClick={() => setPeriod(p)}
-                className={cn("rounded-md px-3 py-1 text-xs font-semibold transition-colors", period === p ? "bg-brand text-brand-foreground dark:bg-primary dark:text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+                aria-pressed={period === p}
+                className={cn(
+                  "rounded-md px-3 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 dark:focus-visible:ring-primary",
+                  period === p ? "bg-brand text-brand-foreground dark:bg-primary dark:text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+                )}>
                 {p}
               </button>
             ))}
@@ -162,8 +166,10 @@ export default function MarketingAnalytics() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
+                  {/* Rows are read-only — analytics summary only. Per-campaign
+                      edit + budget controls live in the channel pages. */}
                   {CAMPAIGNS.map((c) => (
-                    <tr key={c.id} className="transition-colors hover:bg-accent/30">
+                    <tr key={c.id} className="cursor-default">
                       <td className="px-3 py-2.5">
                         <p className="font-medium">{c.name}</p>
                         <p className="text-[11px] text-muted-foreground">{c.channel}</p>

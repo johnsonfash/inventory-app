@@ -35,6 +35,9 @@ type Channel = {
   tone: "violet" | "sky" | "fuchsia" | "rose" | "emerald"
 }
 
+// MOCK DATA — replaced by /v1/marketing/channels when the backend lands.
+// Spend, ROAS, and campaign counts are illustrative; do not treat the
+// numbers as live KPIs. The shape mirrors the real API response.
 const CHANNELS: Channel[] = [
   { href: "/marketing/facebook-ads", name: "Facebook Ads", Icon: Facebook, status: "connected", campaigns: 4, spend30d: 1240, roas: 3.8, tone: "sky" },
   { href: "/marketing/instagram-ads", name: "Instagram Ads", Icon: Instagram, status: "connected", campaigns: 3, spend30d: 980, roas: 4.2, tone: "fuchsia" },

@@ -42,6 +42,16 @@ const FORMATS: { key: Format; label: string; Icon: LucideIcon; cost: number }[] 
   { key: "caption",  label: "Caption",  Icon: TypeIcon, cost: 2 },
 ]
 
+// Example prompts shown in the empty state — tuned to the subject so
+// service / app / custom operators see copy that fits their offer
+// (the catalog-product example wouldn't translate).
+const EXAMPLE_BY_SUBJECT: Record<Subject, string> = {
+  product: 'e.g. "Lead with the 24-hour delivery, keep it under 12 seconds, end on the price." Pallio drafts it, then you refine by chatting.',
+  service: 'e.g. "Open on a customer testimonial, show before/after, end with a same-week booking CTA." Pallio drafts it, then you refine by chatting.',
+  app: 'e.g. "Hook with the core feature in 3 seconds, show 2 quick screens, end on a Get-the-app CTA." Pallio drafts it, then you refine by chatting.',
+  custom: 'e.g. "Tell people who it’s for, what changes after they sign up, end with a clear next step." Pallio drafts it, then you refine by chatting.',
+}
+
 const PLATFORMS = ["Reels", "TikTok", "Feed", "YouTube"] as const
 const TONES = ["Punchy", "Friendly", "Premium", "Playful"] as const
 type Platform = (typeof PLATFORMS)[number]
@@ -100,6 +110,12 @@ export default function GenerateAd() {
   const cost = FORMATS.find((f) => f.key === format)!.cost
   const latest = [...messages].reverse().find((m) => m.artifact)?.artifact
 
+  // Failsafe so a stalled generation can't lock the UI in the "Generating…"
+  // state forever. Real backend should resolve well under this cap.
+  const GENERATION_TIMEOUT_MS = 10_000
+  const generationTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  React.useEffect(() => () => { if (generationTimer.current) clearTimeout(generationTimer.current) }, [])
+
   const run = (instruction: string, isRefine: boolean) => {
     if (subject === "product" ? !item : !subjectName.trim()) {
       toast.error("Pick what you're advertising first")
@@ -112,27 +128,42 @@ export default function GenerateAd() {
     setGenerating(true)
     const youText = instruction.trim() || `Generate a ${tone.toLowerCase()} ${format} for ${platform}.`
     setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: "you", text: youText }])
-    // Simulate the async generation.
-    setTimeout(() => {
-      const artifact = generateAd({ subject, name: subjectName, format, platform, tone, prompt: instruction })
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `a-${Date.now()}`,
-          role: "ai",
-          text: isRefine ? "Updated — here's the new draft:" : `Here's a ${tone.toLowerCase()} ${format} concept for ${platform}:`,
-          artifact,
-        },
-      ])
-      setCredits((c) => c - cost)
+    // Simulate the async generation. Wrapped so a thrown synthesiser
+    // doesn't strand the UI; backend errors will surface the same way.
+    const failsafe = setTimeout(() => {
       setGenerating(false)
-      setPrompt("")
+      toast.error("Generation timed out", { description: "Try again, or simplify your prompt." })
+    }, GENERATION_TIMEOUT_MS)
+    generationTimer.current = setTimeout(() => {
+      try {
+        const artifact = generateAd({ subject, name: subjectName, format, platform, tone, prompt: instruction })
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `a-${Date.now()}`,
+            role: "ai",
+            text: isRefine ? "Updated — here's the new draft:" : `Here's a ${tone.toLowerCase()} ${format} concept for ${platform}:`,
+            artifact,
+          },
+        ])
+        setCredits((c) => c - cost)
+        setPrompt("")
+      } catch {
+        toast.error("Couldn't generate the ad", { description: "Something went wrong. Please try again." })
+      } finally {
+        clearTimeout(failsafe)
+        setGenerating(false)
+      }
     }, 650)
   }
 
   const deploy = () => {
-    toast.success("Sent to the ad builder", { description: "Review channels + budget, then publish." })
-    navigate("/marketing/listings/new")
+    try {
+      navigate("/marketing/listings/new")
+      toast.success("Sent to the ad builder", { description: "Review channels + budget, then publish." })
+    } catch {
+      toast.error("Couldn't open the ad builder", { description: "Try again from the Marketing menu." })
+    }
   }
 
   return (
@@ -190,7 +221,7 @@ export default function GenerateAd() {
                 <Sparkles className="h-8 w-8 text-brand dark:text-primary" />
                 <p className="mt-2 text-sm font-semibold">Describe your ad, or just hit Generate</p>
                 <p className="mt-0.5 max-w-sm text-xs text-muted-foreground">
-                  e.g. "Lead with the 24-hour delivery, keep it under 12 seconds, end on the price." Pallio drafts it, then you refine by chatting.
+                  {EXAMPLE_BY_SUBJECT[subject]}
                 </p>
               </div>
             ) : (
@@ -247,7 +278,11 @@ export default function GenerateAd() {
                 <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white"><Video className="h-3 w-3" /> {latest.platform}</span>
               )}
             </div>
-            <Button onClick={deploy} disabled={!latest}>
+            <Button
+              onClick={deploy}
+              disabled={!latest}
+              title={!latest ? "Generate an ad first" : undefined}
+            >
               Deploy to channels <ArrowRight className="h-4 w-4" />
             </Button>
             <p className="text-[11px] text-muted-foreground">
