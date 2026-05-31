@@ -5,6 +5,14 @@ import { PageShell } from "@/components/page-shell"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { EmptyState } from "@/components/lists/empty-state"
 import { StatusBadge } from "@/components/lists/status-badge"
 import { BottomSheet } from "@/components/mobile/bottom-sheet"
@@ -26,6 +34,7 @@ export default function WebhooksSettings() {
   const [url, setUrl] = React.useState("")
   const [events, setEvents] = React.useState<string[]>([])
   const [pendingToggle, setPendingToggle] = React.useState<string | null>(null)
+  const [removeTarget, setRemoveTarget] = React.useState<Endpoint | null>(null)
 
   const toggleEvent = (e: string) => setEvents((prev) => (prev.includes(e) ? prev.filter((x) => x !== e) : [...prev, e]))
 
@@ -51,9 +60,19 @@ export default function WebhooksSettings() {
       setPendingToggle(null)
     }
   }
-  const remove = (r: Endpoint) => {
-    setRows((prev) => prev.filter((x) => x.id !== r.id))
-    toast(`Endpoint removed`, { description: r.url, action: { label: "Undo", onClick: () => setRows((prev) => [r, ...prev]) } })
+  const confirmRemove = () => {
+    const r = removeTarget
+    if (!r) return
+    try {
+      setRows((prev) => prev.filter((x) => x.id !== r.id))
+      toast.success("Endpoint removed", {
+        description: r.url,
+        action: { label: "Undo", onClick: () => setRows((prev) => [r, ...prev]) },
+      })
+      setRemoveTarget(null)
+    } catch {
+      toast.error("Couldn't remove endpoint. Try again.")
+    }
   }
 
   return (
@@ -93,7 +112,7 @@ export default function WebhooksSettings() {
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <Button size="sm" variant="ghost" onClick={() => toggleActive(r.id)} disabled={pendingToggle === r.id}>{pendingToggle === r.id ? "Saving…" : r.active ? "Pause" : "Resume"}</Button>
-                  <Button size="sm" variant="ghost" onClick={() => remove(r)} aria-label="Delete endpoint" className="text-rose-600 hover:bg-rose-500/10 dark:text-rose-400">
+                  <Button size="sm" variant="ghost" onClick={() => setRemoveTarget(r)} aria-label="Delete endpoint" className="text-rose-600 hover:bg-rose-500/10 dark:text-rose-400">
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -112,7 +131,30 @@ export default function WebhooksSettings() {
         footer={
           <div className="flex items-center justify-end gap-2 pb-3">
             <Button variant="ghost" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={create} disabled={!url.trim() || events.length === 0}>Add endpoint</Button>
+            <Button
+              onClick={create}
+              disabled={!url.trim() || events.length === 0}
+              title={
+                !url.trim() && events.length === 0
+                  ? "Enter a URL and pick at least one event"
+                  : !url.trim()
+                    ? "Enter an endpoint URL"
+                    : events.length === 0
+                      ? "Pick at least one event to subscribe to"
+                      : undefined
+              }
+              aria-label={
+                !url.trim() && events.length === 0
+                  ? "Add endpoint — enter URL and select at least one event"
+                  : !url.trim()
+                    ? "Add endpoint — enter URL"
+                    : events.length === 0
+                      ? "Add endpoint — select at least one event"
+                      : "Add endpoint"
+              }
+            >
+              Add endpoint
+            </Button>
           </div>
         }
       >
@@ -132,9 +174,38 @@ export default function WebhooksSettings() {
               ))}
             </div>
           </div>
+          {/* Tells the operator why "Add endpoint" stays greyed out — saves a confused
+              click + a peek at the form to spot the blocker. */}
+          {(!url.trim() || events.length === 0) && (
+            <p className="text-[11px] text-muted-foreground">
+              {!url.trim() && events.length === 0
+                ? "Enter a URL and select at least one event to enable Add endpoint."
+                : !url.trim()
+                  ? "Enter an endpoint URL to enable Add endpoint."
+                  : "Select at least one event to enable Add endpoint."}
+            </p>
+          )}
           <button type="submit" className="hidden" aria-hidden tabIndex={-1} />
         </form>
       </BottomSheet>
+
+      {/* Delete confirmation — webhook URLs often power critical downstream
+          systems (ERP sync, ops pings). Confirm before we drop the row, even
+          though the toast still offers Undo as a second safety net. */}
+      <Dialog open={removeTarget !== null} onOpenChange={(v) => !v && setRemoveTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete this endpoint?</DialogTitle>
+            <DialogDescription>
+              Pallio will stop POSTing events to <strong className="break-all font-mono">{removeTarget?.url}</strong>. Any system listening here will no longer receive {removeTarget?.events.length ?? 0} subscribed event{(removeTarget?.events.length ?? 0) === 1 ? "" : "s"}. You can undo from the toast if you change your mind.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRemoveTarget(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmRemove}>Delete endpoint</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   )
 }

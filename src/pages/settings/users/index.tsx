@@ -18,6 +18,14 @@ import {
 import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
 import { SummaryStrip } from "@/components/lists/summary-strip"
 import { EmptyState } from "@/components/lists/empty-state"
@@ -326,6 +334,20 @@ function MemberRow({ member }: { member: Member }) {
 
 // ----------- Invites tab -----------
 function InvitesTab() {
+  // Track which invite the operator is about to revoke. Centred dialog
+  // forces a deliberate confirm — the invite link becomes dead on click,
+  // and the invitee can't tell why their link stopped working.
+  const [revokeInviteId, setRevokeInviteId] = React.useState<string | null>(null)
+  const revokingInvite = INVITES.find((i) => i.id === revokeInviteId)
+  const confirmRevokeInvite = () => {
+    if (!revokingInvite) return
+    try {
+      toast.success(`Invite to ${revokingInvite.email} revoked`, { description: "The link no longer works." })
+      setRevokeInviteId(null)
+    } catch {
+      toast.error("Couldn't revoke invite. Try again.")
+    }
+  }
   if (INVITES.length === 0) {
     return (
       <EmptyState
@@ -388,13 +410,28 @@ function InvitesTab() {
               <Button size="sm" variant="outline" onClick={() => toast.success(`Invite resent to ${inv.email}`)}>
                 <RefreshCw className="h-3.5 w-3.5" /> Resend email
               </Button>
-              <Button size="sm" variant="ghost" className="ml-auto text-rose-600 dark:text-rose-400" onClick={() => toast(`Invite to ${inv.email} revoked`, { description: "The link no longer works." })}>
+              <Button size="sm" variant="ghost" className="ml-auto text-rose-600 dark:text-rose-400" onClick={() => setRevokeInviteId(inv.id)}>
                 <Trash2 className="h-3.5 w-3.5" /> Revoke
               </Button>
             </div>
           </li>
         )
       })}
+
+      <Dialog open={revokeInviteId !== null} onOpenChange={(v) => !v && setRevokeInviteId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Revoke this invite?</DialogTitle>
+            <DialogDescription>
+              The link sent to <strong>{revokingInvite?.email}</strong> will stop working immediately. If they still need access, send a fresh invite.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRevokeInviteId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmRevokeInvite}>Revoke invite</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ul>
   )
 }
@@ -472,6 +509,23 @@ function AffiliatesTab({ members, totalSales, formatPrice }: { members: Member[]
 
 // ----------- Sessions tab -----------
 function SessionsTab() {
+  // Revoking a session signs the device out next API hit — operator
+  // sometimes mis-clicks on a teammate's laptop they actually trust, so
+  // confirm before firing.
+  const [revokeSessionId, setRevokeSessionId] = React.useState<string | null>(null)
+  const revokingSession = SESSIONS.find((s) => s.id === revokeSessionId)
+  const revokingSessionMember = revokingSession ? MEMBERS.find((m) => m.id === revokingSession.memberId) : undefined
+  const confirmRevokeSession = () => {
+    if (!revokingSession) return
+    try {
+      toast.success(`Signed out ${revokingSession.device}`, {
+        description: revokingSessionMember ? `${revokingSessionMember.name}'s device will be signed out on next sync.` : undefined,
+      })
+      setRevokeSessionId(null)
+    } catch {
+      toast.error("Couldn't revoke session. Try again.")
+    }
+  }
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-baseline gap-1.5">
@@ -505,7 +559,12 @@ function SessionsTab() {
                   </p>
                 </div>
                 {!s.current && (
-                  <Button size="sm" variant="ghost" className="text-rose-600 dark:text-rose-400">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-rose-600 dark:text-rose-400"
+                    onClick={() => setRevokeSessionId(s.id)}
+                  >
                     <Trash2 className="h-3.5 w-3.5" /> Revoke
                   </Button>
                 )}
@@ -518,6 +577,21 @@ function SessionsTab() {
         <Activity className="mr-1.5 inline h-3.5 w-3.5" />
         Every sign-in attempt + revocation is logged. Audit trail lands when the real backend ships.
       </div>
+
+      <Dialog open={revokeSessionId !== null} onOpenChange={(v) => !v && setRevokeSessionId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Revoke this session?</DialogTitle>
+            <DialogDescription>
+              <strong>{revokingSessionMember?.name ?? "This member"}</strong>'s {revokingSession?.device ?? "device"} will be signed out on its next API call. They can sign back in with their credentials.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRevokeSessionId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmRevokeSession}>Revoke session</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

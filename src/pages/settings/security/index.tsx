@@ -28,6 +28,14 @@ import { FormSection } from "@/components/forms/form-section"
 import { SwitchField } from "@/components/forms/switch-field"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import {
@@ -149,6 +157,7 @@ export default function SecuritySettings() {
   const [twoFAStatus, setTwoFAStatus] = React.useState<"off" | "setup" | "verifying" | "on">("off")
   const [twoFACode, setTwoFACode] = React.useState("")
   const [codesRevealed, setCodesRevealed] = React.useState(false)
+  const [regenerateOpen, setRegenerateOpen] = React.useState(false)
   const [loginAlerts, setLoginAlerts] = React.useState(true)
   const [trustedDeviceDays, setTrustedDeviceDays] = React.useState("30")
 
@@ -484,7 +493,7 @@ export default function SecuritySettings() {
                   <Button size="sm" variant="outline" onClick={() => copy(RECOVERY_CODES.join("\n"), "Recovery codes")}>
                     <Copy className="h-3.5 w-3.5" /> Copy all
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => toast.success("New recovery codes generated. Old ones are invalid.")}>
+                  <Button size="sm" variant="ghost" onClick={() => setRegenerateOpen(true)}>
                     <RefreshCcw className="h-3.5 w-3.5" /> Regenerate
                   </Button>
                 </div>
@@ -747,6 +756,36 @@ export default function SecuritySettings() {
           </Link>
         </section>
       </div>
+
+      {/* Regenerate recovery codes confirmation — irreversible: any old code
+          held in a password manager stops working the moment new ones land. */}
+      <Dialog open={regenerateOpen} onOpenChange={setRegenerateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Regenerate recovery codes?</DialogTitle>
+            <DialogDescription>
+              Every existing recovery code will stop working immediately. If you've saved your current codes in a password manager or printed them out, replace them right away. This can't be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRegenerateOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                try {
+                  setCodesRevealed(true)
+                  toast.success("New recovery codes generated. Old ones are invalid.")
+                  setRegenerateOpen(false)
+                } catch {
+                  toast.error("Couldn't regenerate recovery codes. Try again.")
+                }
+              }}
+            >
+              Regenerate codes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   )
 }
