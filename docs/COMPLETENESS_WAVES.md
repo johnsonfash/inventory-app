@@ -204,3 +204,209 @@ guidance). The frontend completeness pass is done.
 MVP-of-this-plan to ship visible value fast: **W1 + W2 + W3**. Then pick the highest-pain content wave (likely **W4** or **W6**).
 
 Related backend spec: `docs/BACKEND_PLAN.md` (`api/billing` credits, `api/marketing` AI gen). Memory: `project_marketing_site_and_pricing.md`, `project_waves_progress.md`.
+
+---
+
+# Round 2 — Post-meeting waves (2026-05-30)
+
+Captured from a customer interview with a business owner running on SAP-style ERPs.
+Six gaps surfaced that **W1–W10 do not cover**. Same principles apply:
+**mobile-first, simplicity over features, industry-agnostic, no hard module gating.**
+
+## Coverage map (new pain points → wave)
+
+| # | Pain point (his words / paraphrase) | Wave |
+|---|---|---|
+| 1 | "Why am I seeing restaurant things in a retail business?" — industry-specific terms + default surfaces per industry | W11 |
+| 2 | "Customer got 90 of 100 — 10 damaged. Resolution team sees a ticket, routes to handler, handler messages customer, refund or replan delivery" | W12 |
+| 3 | "AI to tell me what's selling least / most, and what button to click to add an item" | W13 |
+| 4 | "Inventory reorder level report" — the one-page 'what do I need to reorder today' view | W14 |
+| 5 | "Port their data — migration from SAP / ERPs should be easy" | W15 |
+| 6 | "Admin sees an extended view of every store, or selected, or one" | W16 |
+
+## Observations before the waves
+
+- **`SEP apps` is almost certainly SAP**, transcribed by ear. SAP Business One / S/4HANA. The migration ask (W15) is designed around the SAP / Odoo / QuickBooks ecosystem.
+- **"Inventory reorder level report"** is a standard ERP page. We already have the data (per-item `reorderPoint` in the catalog + a "Low stock" KPI on `/inventory`). W14 is mostly **UX surfacing** — promote the existing data to a named page with a 1-click "Create PO" — small build, outsized perception.
+- **The "let admins disable modules in settings" request is the right symptom, wrong cure.** Hard module gating creates orphan records, broken deep links, "where did X go?" support burden, and undermines the cross-industry moat (memory: `feedback_no_hard_modules`). **W11 takes the safer route**: per-industry sidebar curation + a per-user "Hide section" preference. Routes and data stay live; only the chrome filters. If you want literal module toggles after seeing this, override here and we'll wire it as data-preserving "soft" toggles only.
+- **The customer-relations ask is bigger than `/communications` covers.** Communications today is templates + outbound messaging. The customer wants a **case lifecycle**: open → assigned → in-progress → resolved, **with attached refund/replacement/redelivery records**. That's W12 — built on top of communications, not replacing it.
+- **The AI ask is two distinct surfaces stitched onto one chat.** Data Q&A routes to deterministic aggregators ("what sold least?"). App help routes to a glossary/nav index ("how do I add an item?"). Both feel the same to the user; both can live at `/ai`.
+- **"Industry-specific terms"** is *not* the same as "industry-specific features". We keep one engine (no vertical modules — memory: `project_recipe_bom_system`) and swap **display vocabulary** at the i18n layer. Restaurant says "Ingredients / Menu items / Recipes"; salon says "Products / Treatments / Packages"; same database, same logic.
+
+---
+
+## W11 — Industry vocabulary & sidebar curation
+**Goal:** "This app gets us." Same engine, different language and default surfaces per industry — without hard module gating.
+
+**Scope:**
+- **Vocabulary layer.** `src/lib/i18n/industry.ts` — keyed term map per industry. Initial keys: `item.singular/plural`, `composite.title`, `recipe.title`, `production.title`, `lot.title`, `service.title`, `category.title`, `bundle.title`, `customer.title`, `vendor.title`. Industries seeded: retail (default), restaurant/QSR, salon/spa, hospital/pharmacy, apparel, manufacturing, services. Examples:
+  - Restaurant → `item="ingredient"`, `composite="menu item"`, `lot="batch"`
+  - Salon → `item="product"`, `service="treatment"`, `bundle="package"`
+  - Hospital → `item="consumable"`, `service="procedure"`, `vendor="supplier"`
+  - Fallback to retail for any unseeded key.
+- **Hook:** `useTerm("item.plural")`. Used in page titles, table headers, empty-state copy, nav labels, command-palette labels, glossary, dashboard tiles. Quiet enough that it doesn't change *what* a page does — only how it reads.
+- **Default sidebar curation per industry.** Onboarding's industry pick seeds a sidebar profile (e.g. brick-only restaurant hides `Storefront` by default; retail hides `Appointments` by default; services hides `Production/Lots`). Stored in `org.settings.navProfile`. **Routes still live, deep links still work, data still accumulates** — only `NAV`'s render filter changes. Reachable via search/command palette.
+- **Per-user "Hide section" preference.** Settings → Personal → Sidebar. Checkboxes per section, persisted via `kvJson`. Doesn't affect other users or data.
+- **Glossary follows vocabulary.** `help/glossary` reads `useTerm` so the help docs speak in the same words the user sees in the UI.
+- **Onboarding upgrade.** "Pick what your business is closest to" → preview the renamed nav before confirming.
+
+**Backend:** org-settings persistence for the industry profile (kv today); per-user prefs already kv. No new endpoints needed for v1. **Size:** ~2 days. All frontend now.
+
+**Decision needed:** confirm "hide from sidebar" (current direction) vs literal "disable module". Memory: `feedback_no_hard_modules`.
+
+---
+
+## W12 — Customer relations: tickets, resolution, partial fulfillment
+**Goal:** When a customer says "I got 90 of 100, 10 damaged" — a ticket exists, the right person sees it, they message the customer back, they resolve it with the right financial/inventory action attached. One screen, one workflow, no swivel-chair.
+
+This is the biggest of the post-meeting waves. Designed to **build on `/communications`**, not replace it — every message in a ticket creates a comms record under the hood.
+
+**Scope:**
+
+**Ticket entity & lifecycle**
+- New module: `src/pages/sales/tickets` (queue + detail + new) and a customer-facing entry in `src/pages/storefront/orders/[id]` ("Get help with this order"). Sidebar entry under **Sales** labelled per W11 vocabulary ("Customer issues" / "Guest issues" / "Patient issues").
+- States: **new → triaged → assigned → in-progress → awaiting-customer → resolved → closed**, with **reopen** from closed within configurable window (default 14 days).
+- Categories: `damaged-in-transit`, `missing-items`, `wrong-items`, `defective`, `late-delivery`, `billing-issue`, `refund-request`, `service-quality`, `other`.
+- Priority: `low | normal | high | urgent`. **Auto-urgent rules:** order value > ₦X, or category in {damaged, missing-items, late-delivery} for VIP customers, or > 10% of order value affected.
+- Linked entities: **order** (sales or storefront), **customer**, **affected line items + qty** (so "10 of 100 damaged" is a real shape, not just free text), **shipment** (if applicable), **internal owner**, **conversation thread**, **resolution actions** (see below).
+
+**Intake (where tickets come from)**
+- **Storefront "Get help" widget** on order-detail pages → guided form (which order, which items, what happened, photo upload). Creates ticket auto-linked to order/customer/items, status = `new`.
+- **Manual create from POS / sales / storefront** — staff captures a walk-in or phone complaint. Customer picker + (optional) order picker + line picker. One-tap from a sales-order detail page: "Open ticket about this order."
+- **Inbound channels (backend-gated):** WhatsApp / email / SMS — auto-create or auto-attach to ticket when the message references a known order # or customer.
+
+**Routing & ownership**
+- **Auto-route rules** in `src/lib/tickets/routing.ts`: category → team (damaged → Operations; billing → Finance; defective → Returns; service-quality → Floor Manager). Location-aware (route to the local team for the relevant warehouse/branch first).
+- **Assignment modes (per team):** round-robin, least-loaded, manual. Reassignable mid-flight; reassignment posts a system note in the thread.
+- **Notifications:** in-app + push (when FCM is live) for assignee on (new assignment / customer reply / SLA breach approaching). Email digest for managers (backend).
+- **SLA timer** per priority (urgent: 2h first response + 24h resolution; high: 6h+48h; normal: 1d+5d; low: 3d+10d). Visible on every queue row and the detail header. Stalled tickets escalate to the team manager.
+
+**Resolution actions (this is the hinge that makes it real)**
+A ticket can attach one or more **resolution actions**, each producing a real record in the relevant module so the financial picture stays correct:
+- **Refund** (full, or partial by qty / amount) → creates a POS refund or sales refund, posts to the ledger (accounting auto-post is already in place).
+- **Replacement order** → creates a new sales order for the affected qty, ships to the same address, flagged `replacement-for: <ticket>` so it **doesn't double-count revenue** in reporting.
+- **Replan delivery / new shipment** → creates a new `sales/shipments` record for just the missing/damaged qty. No new revenue, just fulfillment.
+- **Store credit** → posts to the customer ledger.
+- **Apology + discount code** → generates a single-use discount tied to the customer, expires 30/60/90d.
+- **No action** → closed without remedy (with required reason).
+
+Multiple actions can stack: "refund the 10 damaged + send a 5% future-order discount" is two actions on one ticket.
+
+**Customer communication (the "message customer" piece)**
+- Every ticket has a **two-way thread**. Outbound channel honours the customer's preferred channel (email / SMS / WhatsApp), with templates from W4.
+- **Macro replies** seeded per category: damaged-acknowledgement, late-delivery-update, refund-issued, replacement-on-its-way, awaiting-photo, resolved-thanks.
+- "Message customer" composer **inside the ticket detail**. Picks channel + template; can auto-attach a "refund issued for ₦X" or "replacement order #Y created" snippet when a resolution action just fired.
+- Customer's reply (when inbound channels are wired) appears in the thread; ticket status auto-flips `awaiting-customer → in-progress`.
+
+**Queue & detail UX**
+- **Queue** (`/sales/tickets`): filterable list — status, category, priority, assignee, my-team, SLA-breaching, by-location. Card row shows ticket #, customer, order #, age, SLA chip, last action. Mobile-first layout (swipeable rows reuse `mobile/swipeable-row`).
+- **Detail** (`/sales/tickets/[id]`): single-page layout with:
+  - Header: ticket #, status pill, SLA chip, assignee
+  - Left: timeline (status changes + customer/internal messages + resolution actions interleaved chronologically)
+  - Right: affected lines panel (with qty inputs), customer info side panel, order/shipment links
+  - Bottom action bar: Resolution drawer ("Issue refund", "Create replacement", "Send message"), internal notes (not customer-visible).
+- **Empty state**: "No open issues. Last resolved: ticket #1284, 12m ago."
+
+**Reporting**
+- **Tickets dashboard** (`/reporting/tickets`): volume by category, by location, avg time-to-resolve, refund-vs-replacement split, repeat-issue rate per customer, CSAT (1-tap rating sent on close — opt-in).
+- Surfaces into dashboard AI insight cards: *"Damaged-in-transit tickets up 40% from Lagos warehouse this week — likely shipment-handler issue."* Insights engine already supports this shape (`category: "system"` or new `"support"`).
+
+**RBAC**
+- New permissions: `tickets:view`, `tickets:assign`, `tickets:resolve`, `tickets:refund` (latter gated by `pos:refund` existing perm).
+- Default roles: Manager + Owner have full; Sales-rep can create/view their assigned + view own customer's; Marketer no access by default; Custom team roles toggle per area (matches `lib/team/types.ts` shape).
+
+**Backend (what real implementation needs):**
+- Ticket CRUD with linked-entity FKs to orders / customers / shipments / refunds.
+- Routing engine (rules-eval on ticket create + on category change).
+- SLA timers via BullMQ (first-response, resolution, breach-escalation jobs).
+- Inbound channel webhooks: WhatsApp Business, Mailgun inbound parse, Twilio SMS inbound.
+- Outbound send routing through the same providers (W4 backend territory).
+- CSAT follow-up job (e.g. 24h after `closed`).
+- Push notifications via pallio-fcm.
+
+**Size:** ~5–6 days frontend (queue + detail + intake + resolution drawer + reporting + dashboard hookup). Backend ~2–3 weeks (worker + provider wiring + SLA scheduler).
+
+**Frontend can ship against mocks first** — every ticket CRUD/transition/action is kv-backed for now (same approach as `lib/sales/data.ts`), with mock customer replies on a timer to demo the inbound side.
+
+---
+
+## W13 — AI assistant (data Q&A + app help)
+**Goal:** Replace the `/ai` placeholder with a real assistant that answers two question shapes on one chat: "what's selling least at Lagos last month?" and "how do I add an item?"
+
+**Scope:**
+- **One chat surface at `/ai`**. Auto-routes each prompt to one of two handlers behind the scenes — no UI toggle.
+- **Data Q&A handler.** A deterministic query layer reading the same in-memory catalog/sales/inventory/orders/tickets state the rest of the app uses. Initial canned intents: top sellers, slowest sellers, dead stock, margin leaderboard, customer top spenders, supplier on-time rate, location compare, **open tickets by category** (W12 hookup). Each maps to a small JS aggregator over our state. The LLM picks the intent and parameterizes it (timeframe, location, category); the aggregator runs deterministically and the LLM only writes the prose around the result. **Important:** the LLM never sees raw rows of customer data — only the aggregated result. This is also a privacy/compliance win.
+- **App help handler.** Vector or keyword index over `help/glossary` + page titles + nav labels (using W11 vocabulary so the help speaks the user's terms). Answers "how do I X?" with a short answer + a deep link to the right page + (where applicable) a "do it for me" CTA that opens the matching new-form pre-filled.
+- **Sources visible.** Every answer shows what was queried (intent name + filters) or which help page was cited. One-click "show me the data" opens the matching reporting page pre-filtered.
+- **Credits metering.** Same `org.aiCredits` ledger as the W9 ad studio. Credits widget in the chat header.
+- **Quick suggestions** in the empty state: "What sold least last week?", "How do I issue a refund?", "Reorder list for Lagos", "Open tickets older than 24h", "How do I add a recipe?"
+- **Conversation history** persisted per user (kvJson initially), exportable from W6 export module.
+- **Existing design reference**: `docs/AI_CHAT_BACKEND.md` already covers the chat backend in depth — prompt assembly, tool registry, multi-provider fallback, SSE contract. W13 implements its frontend half.
+
+**Backend:** LLM provider (Anthropic API per `claude-api` skill), vector index for help pages (or keyword for v1), credit-ledger debit, conversation persistence, tool registry from `AI_CHAT_BACKEND.md`. Data Q&A handlers are app-side, no new endpoints for them. **Size:** ~3 days frontend (chat surface, intent layer, sources panel, history). Backend ~1 week (provider + vectors + credits + SSE).
+
+---
+
+## W14 — Reorder Report & buyer's morning view
+**Goal:** The buyer opens the app and sees "here's what to reorder today" — one page, one action.
+
+**Scope:**
+- New page **`/reporting/reorder`**. Table of every SKU at or below reorder point: name, location, on-hand, reorder point, average daily sell-through (derived from movements), days-of-cover remaining, preferred supplier, supplier lead time, suggested order qty (default: `reorderPoint * 2 - onHand`, editable inline).
+- **Filters:** location, supplier, category, "below safety" (under safety stock) vs "at point" (between safety and reorder point), supplier lead time.
+- **Suggested PO grouping**: rows group by supplier with a per-supplier "Create PO" button → opens `/purchasing/pos/new` pre-populated with that supplier's selected lines and qtys.
+- **Bulk select** → "Create POs" → splits into N draft POs by supplier in one action.
+- Surfaces the same data as a dashboard card ("12 SKUs below reorder — review").
+- Honours W11 vocabulary (restaurant sees "Ingredients to reorder", retail sees "Items to reorder", hospital sees "Consumables to reorder").
+
+**Backend:** none beyond existing inventory (sales velocity derivable from `recordStockMovement` log). **Size:** ~1 day. All frontend now.
+
+---
+
+## W15 — Migration: CSV importer + ERP exit ramps
+**Goal:** A SAP / Odoo / QuickBooks user can move to Pallio in an afternoon, not a quarter.
+
+**Scope:**
+- New page **`/settings/import`** (and a landing-site CTA from pricing: "Coming from SAP, Odoo, or QuickBooks?").
+- **Datasets supported (v1):** Customers, Suppliers/Vendors, Items (with units / categories / brands), Item stock-on-hand per location, Chart of Accounts, Open invoices (AR), Open bills (AP).
+- **Per-dataset flow:** download template CSV → upload filled CSV → **column mapper** (auto-match known headers from SAP/Odoo/QuickBooks/Generic; manual remap; remember mapping per source) → **preview & validate** (per-row errors inline, "fix and re-upload only failed rows" affordance) → commit → **undo within 30 minutes** (writes a reverse-set to the audit log).
+- **Source presets:** SAP B1, Odoo, QuickBooks Online, Zoho Books, Sage 50, Generic CSV. Each preset knows the source's column names so the mapper pre-fills.
+- **Export side** (extends W6 export): make sure every importable dataset also has "Download as CSV" using the **same column shape** — so customers can round-trip and don't feel locked in. This is a sales argument as much as an engineering decision.
+- **Audit log** entry per import: who, when, dataset, row counts, error counts. Reuses W6 audit module.
+- **Landing-site copy hook (W1 follow-up):** "Switch from SAP in an afternoon" tile on `/marketing/pricing` — links to `/settings/import` after trial signup. Real moat against the SAP-tax pain point this customer raised.
+
+**Backend:** import worker (BullMQ), staging tables per dataset (don't write to live tables until validate passes), validation library, undo window (30-min reverse-set). **Size:** ~3 days frontend (per-dataset flow, mapper, presets, error display). Backend ~1 week (workers, validation, undo).
+
+---
+
+## W16 — Multi-location aggregation toggle
+**Goal:** Admin chooses **All / pick / one** location once, every page respects it.
+
+**Scope:**
+- Global location scope dropdown in the app shell, next to the org switcher (extends existing `OrgLocationSwitch`). Modes: **All locations** (default for HQ admin), **Pick subset** (multi-select), **Single location**. Persists per user.
+- A shared hook `useLocationScope()` → returns `{ ids: string[] | "all", names: string[], isAll, isSingle }`. Every data hook (dashboard, reporting, inventory, sales read-views, tickets) reads it and filters.
+- **KPI surfaces show per-location breakdown** when scope is `All` or `subset` (mini-bar next to each metric, or expandable rows). Single-location view stays clean.
+- **Reporting pages** get a per-location column when scope > 1, with totals row.
+- **POS itself stays bound to the cashier's clocked-in location** (sale ops are local; you don't accidentally ring a sale at HQ). Only read-views/reporting respect the global scope.
+- **Audit log** entries record the scope at the time of action ("Refund issued — scope: Lekki Phase 1") so it's easy to retrace.
+- **Dashboard "compare locations" widget** when scope = All — small chart of top KPI per location.
+
+**Backend:** none for scope plumbing; per-location filtering is already implicit in the data shape. Backend just needs to honour a `?locations=` query param. **Size:** ~2 days. All frontend now (`useOrgLocation` already exists; this layer adds the multi-select + the hook).
+
+---
+
+## Recommendations & priority order (Round 2)
+
+**Ship order:**
+
+1. **W14** (Reorder Report) — 1 day, no backend, immediate "they listened" signal. Do first.
+2. **W11** (Vocabulary + sidebar curation) — 2 days, no backend, **highest perceived "this app gets us" lift per hour**. Do second.
+3. **W16** (Location scope) — 2 days, no backend, unblocks multi-store admins. Do third — the dashboard becomes meaningfully more useful overnight.
+4. **W13** (AI assistant) — 3 days frontend against mocks; ~1 week backend later. Start the frontend now in parallel with backend bootstrapping (already specced in `AI_CHAT_BACKEND.md`).
+5. **W12** (Tickets & resolution) — 5–6 days frontend; the biggest build of the six but the **biggest competitive differentiator vs SAP** for SMBs. Do after the quick wins land. Frontend ships against mocks; inbound channels wait for backend.
+6. **W15** (Migration importer) — 3 days frontend, 1 week backend. Do alongside or just after the backend bootstrap — the SAP/QuickBooks exit ramp is what gets enterprise-curious SMBs onto the platform.
+
+**Cluster strategy:** W11 + W14 + W16 together is a single "we heard you" release (~5 days). Then W12 is its own release. Then W13 + W15 land with the backend phase.
+
+**MVP-of-Round-2 to ship visible value fast: W11 + W14 + W16.**
+
+Related: `docs/BACKEND_PLAN.md`, `docs/AI_CHAT_BACKEND.md`. Memory: `feedback_industry_agnostic_derivations`, `feedback_no_hard_modules`, `project_recipe_bom_system`, `project_inventory_catalog_source`.
