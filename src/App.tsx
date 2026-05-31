@@ -16,6 +16,7 @@ import { CommandPalette } from "@/components/command/command-palette"
 import { CommandPaletteProvider } from "@/contexts/command-palette"
 import { CurrencyProvider } from "@/contexts/currency"
 import { PageMetaProvider } from "@/contexts/page-meta"
+import { IndustryProvider } from "@/hooks/use-industry"
 import { useNative } from "@/hooks/use-native"
 import { useBackButton } from "@/hooks/use-back-button"
 import { useDeepLinks } from "@/hooks/use-deep-links"
@@ -178,12 +179,14 @@ export default function App() {
           <ScrollToTop />
           <BiometricGate>
             <NetworkBanner />
-            <CurrencyProvider>
-              <CommandPaletteProvider>
-                <ShellRouter />
-                <CommandPalette />
-              </CommandPaletteProvider>
-            </CurrencyProvider>
+            <IndustryProvider>
+              <CurrencyProvider>
+                <CommandPaletteProvider>
+                  <ShellRouter />
+                  <CommandPalette />
+                </CommandPaletteProvider>
+              </CurrencyProvider>
+            </IndustryProvider>
             <PWAInstaller />
           </BiometricGate>
           <Toaster position="bottom-right" richColors closeButton />

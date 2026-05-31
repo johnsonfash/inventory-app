@@ -20,7 +20,22 @@ import {
   type IndustryKey,
   type SellsKind,
 } from "@/lib/profile/business-profile"
+import { setActiveIndustry } from "@/lib/industry/storage"
+import type { IndustryKey as F1IndustryKey } from "@/lib/industry/profile"
 import { resetFirstRun } from "@/components/onboarding/first-run-modal"
+
+// Map the 6-key onboarding answer → F1's richer 10-key IndustryKey. Mirrors
+// the mapping in `lib/industry/storage.ts` (kept here so saving the business
+// profile also promotes the F1 active industry, which drives terminology +
+// capability hints across the app).
+const BUSINESS_TO_F1: Record<IndustryKey, F1IndustryKey> = {
+  retail: "retail",
+  food: "restaurant",
+  services: "services",
+  auto: "auto",
+  manufacturing: "manufacturing",
+  other: "retail",
+}
 
 export default function BusinessSettings() {
   useAutoMarkStep("business")
@@ -73,6 +88,10 @@ export default function BusinessSettings() {
         // of this form is still mock until the backend lands, but the
         // profile is real — it drives onboarding emphasis + smart defaults.
         saveBusinessProfile({ industry, sells })
+        // Mirror into the F1 industry curation engine so terminology +
+        // capability hints across the app react to the change. Fires
+        // `pallio:industry-changed` which IndustryProvider listens for.
+        setActiveIndustry(BUSINESS_TO_F1[industry])
         setTimeout(() => {
           setSubmitting(false)
           toast.success("Business details saved")
@@ -113,8 +132,9 @@ export default function BusinessSettings() {
             <Input placeholder="Funke Apparel" />
           </FormField>
           <FormField
-            label="What you run"
-            tooltip="Your answer to the first-run “What do you run?” question. Pallio uses it to order your setup steps and pre-fill smart defaults — nothing is ever hidden, and you can change it any time."
+            label="Primary industry"
+            hint="We tailor defaults — terminology, suggested features, sidebar order — to match. You can still use every Pallio feature."
+            tooltip="Your answer to the first-run “What do you run?” question. Pallio uses it to order your setup steps, pre-fill smart defaults, and tune terminology (e.g. ‘menu items’ for restaurants, ‘parts’ for auto). Nothing is ever hidden, and you can change it any time."
           >
             <Select value={industry} onValueChange={(v) => setIndustry(v as IndustryKey)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
