@@ -7,27 +7,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
-import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
+import { StatusBadge } from "@/components/lists/status-badge"
 import { EmptyState } from "@/components/lists/empty-state"
 import { SummaryStrip } from "@/components/lists/summary-strip"
 import { useCurrency } from "@/contexts/currency"
-
-type Status = "approved" | "pending" | "refunded" | "rejected"
-type Row = { id: string; invoice: string; customer: string; amount: number; reason: string; status: Status; date: string }
-
-const rows: Row[] = [
-  { id: "RET-1041", invoice: "INV-3302", customer: "Linda M.", amount: 92.15, reason: "Damaged", status: "refunded", date: "2026-05-19" },
-  { id: "RET-1042", invoice: "INV-3305", customer: "Acme Co", amount: 480.0, reason: "Wrong size", status: "approved", date: "2026-05-18" },
-  { id: "RET-1043", invoice: "INV-3303", customer: "NovaApps", amount: 88.0, reason: "Changed mind", status: "pending", date: "2026-05-17" },
-  { id: "RET-1040", invoice: "INV-3300", customer: "Zenith Ltd", amount: 220.0, reason: "Defective", status: "rejected", date: "2026-05-14" },
-]
-
-const tone: Record<Status, StatusTone> = {
-  approved: "info",
-  pending: "warning",
-  refunded: "success",
-  rejected: "danger",
-}
+import { RETURNS as rows, RETURN_TONE as tone } from "./data"
 
 export default function SalesReturns() {
   const isMobile = useIsMobile()
@@ -91,7 +75,7 @@ export default function SalesReturns() {
           <ul className="space-y-2">
             {filtered.map((r) => (
               <li key={r.id}>
-                <Link to="/sales/returns" className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+                <Link to={`/sales/returns/${r.id}`} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300">
                     <PackageMinus className="h-4 w-4" />
                   </span>
@@ -122,6 +106,7 @@ export default function SalesReturns() {
                   <th className="px-3 py-2.5 font-medium">Reason</th>
                   <th className="px-3 py-2.5 font-medium">Status</th>
                   <th className="px-3 py-2.5 font-medium">Date</th>
+                  <th className="px-3 py-2.5 text-right font-medium" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -134,6 +119,9 @@ export default function SalesReturns() {
                     <td className="px-3 py-2.5 text-muted-foreground">{r.reason}</td>
                     <td className="px-3 py-2.5"><StatusBadge tone={tone[r.status]} withDot>{r.status}</StatusBadge></td>
                     <td className="px-3 py-2.5 text-muted-foreground">{r.date}</td>
+                    <td className="px-3 py-2.5 text-right">
+                      <Button size="sm" variant="ghost" asChild><Link to={`/sales/returns/${r.id}`}>Open</Link></Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

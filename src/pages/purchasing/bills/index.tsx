@@ -92,7 +92,7 @@ export default function Bills() {
           <ul className="space-y-2">
             {filtered.map((r) => (
               <li key={r.id}>
-                <Link to="/purchasing/bills" className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+                <Link to={`/purchasing/bills/${r.id.toLowerCase()}`} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300">
                     <Receipt className="h-4 w-4" />
                   </span>
@@ -138,7 +138,7 @@ export default function Bills() {
                     <td className="px-3 py-2.5"><StatusBadge tone={tone[r.status]} withDot>{r.status}</StatusBadge></td>
                     <td className={r.status === "overdue" ? "px-3 py-2.5 font-medium text-rose-600 dark:text-rose-400" : "px-3 py-2.5 text-muted-foreground"}>{r.due}</td>
                     <td className="px-3 py-2.5 text-right">
-                      <Button size="sm" variant="ghost" asChild><Link to="/purchasing/bills">Pay</Link></Button>
+                      <Button size="sm" variant="ghost" asChild><Link to={`/purchasing/bills/${r.id.toLowerCase()}`}>Pay</Link></Button>
                     </td>
                   </tr>
                 ))}

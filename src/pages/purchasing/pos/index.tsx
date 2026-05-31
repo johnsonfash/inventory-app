@@ -1,5 +1,6 @@
 import * as React from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import {
   CheckCircle2,
   ChevronRight,
@@ -91,6 +92,7 @@ function initialsOf(name: string) {
 
 export default function PurchaseOrders() {
   const isMobile = useIsMobile()
+  const navigate = useNavigate()
   const [query, setQuery] = React.useState("")
   const [filterOpen, setFilterOpen] = React.useState(false)
   const [statuses, setStatuses] = React.useState<POStatus[]>([])
@@ -213,11 +215,21 @@ export default function PurchaseOrders() {
               <li key={p.id}>
                 <SwipeableRow
                   rightActions={[
-                    { label: "Receive", tone: "primary", icon: <Truck className="h-4 w-4" />, onPress: () => {} },
-                    { label: "Close", tone: "neutral", icon: <CheckCircle2 className="h-4 w-4" />, onPress: () => {} },
+                    {
+                      label: "Receive",
+                      tone: "primary",
+                      icon: <Truck className="h-4 w-4" />,
+                      onPress: () => navigate(`/purchasing/receipts/new?po=${encodeURIComponent(p.id)}`),
+                    },
+                    {
+                      label: "Close",
+                      tone: "neutral",
+                      icon: <CheckCircle2 className="h-4 w-4" />,
+                      onPress: () => toast.success(`Closed ${p.id}`),
+                    },
                   ]}
                 >
-                  <Link to="/purchasing/pos" className="flex items-center gap-3 p-3">
+                  <Link to={`/purchasing/pos/${p.id.toLowerCase()}`} className="flex items-center gap-3 p-3">
                     <span
                       className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${avatarTint(p.vendor)}`}
                     >
@@ -294,7 +306,7 @@ export default function PurchaseOrders() {
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       <Button size="sm" variant="ghost" asChild>
-                        <Link to="/purchasing/pos">Open</Link>
+                        <Link to={`/purchasing/pos/${p.id.toLowerCase()}`}>Open</Link>
                       </Button>
                     </td>
                   </tr>

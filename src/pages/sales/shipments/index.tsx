@@ -7,26 +7,10 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
-import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
+import { StatusBadge } from "@/components/lists/status-badge"
 import { EmptyState } from "@/components/lists/empty-state"
 import { SummaryStrip } from "@/components/lists/summary-strip"
-
-type Status = "label" | "in-transit" | "delivered" | "returned"
-type Row = { id: string; order: string; carrier: string; tracking: string; status: Status; eta: string }
-
-const rows: Row[] = [
-  { id: "SH-2104", order: "SO-7842", carrier: "DHL", tracking: "JD0102942", status: "delivered", eta: "Delivered May 19" },
-  { id: "SH-2105", order: "SO-7849", carrier: "FedEx", tracking: "742992128", status: "in-transit", eta: "Arriving May 22" },
-  { id: "SH-2106", order: "SO-7846", carrier: "UPS", tracking: "1Z999AA8", status: "label", eta: "Awaiting pickup" },
-  { id: "SH-2102", order: "SO-7820", carrier: "DHL", tracking: "JD0100214", status: "returned", eta: "Returned" },
-]
-
-const tone: Record<Status, StatusTone> = {
-  label: "neutral",
-  "in-transit": "info",
-  delivered: "success",
-  returned: "warning",
-}
+import { SHIPMENTS as rows, SHIPMENT_TONE as tone } from "./data"
 
 export default function SalesShipments() {
   const isMobile = useIsMobile()
@@ -92,7 +76,7 @@ export default function SalesShipments() {
           <ul className="space-y-2">
             {filtered.map((r) => (
               <li key={r.id}>
-                <Link to="/sales/shipments" className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+                <Link to={`/sales/shipments/${r.id}`} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand dark:bg-primary/15 dark:text-primary">
                     <Truck className="h-4 w-4" />
                   </span>
@@ -122,6 +106,7 @@ export default function SalesShipments() {
                   <th className="px-3 py-2.5 font-medium">Tracking</th>
                   <th className="px-3 py-2.5 font-medium">Status</th>
                   <th className="px-3 py-2.5 font-medium">ETA</th>
+                  <th className="px-3 py-2.5 text-right font-medium" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -133,6 +118,9 @@ export default function SalesShipments() {
                     <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{r.tracking}</td>
                     <td className="px-3 py-2.5"><StatusBadge tone={tone[r.status]} withDot>{r.status}</StatusBadge></td>
                     <td className="px-3 py-2.5 text-muted-foreground">{r.eta}</td>
+                    <td className="px-3 py-2.5 text-right">
+                      <Button size="sm" variant="ghost" asChild><Link to={`/sales/shipments/${r.id}`}>Open</Link></Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

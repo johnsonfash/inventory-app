@@ -118,7 +118,7 @@ export default function Suppliers() {
                     { label: "Email", tone: "neutral", icon: <Mail className="h-4 w-4" />, onPress: () => { window.location.href = `mailto:${r.email}` } },
                   ]}
                 >
-                  <Link to="/purchasing/vendors" className="flex items-center gap-3 p-3">
+                  <Link to={`/purchasing/vendors/${r.name.toLowerCase().replace(/\s+/g, "-")}`} className="flex items-center gap-3 p-3">
                     <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold ${avatarTint(r.name)}`}>
                       {initialsOf(r.name)}
                     </span>

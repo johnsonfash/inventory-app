@@ -97,7 +97,7 @@ export default function MemberDetailPage() {
                 {recent.map((i) => (
                   <li key={i.id}>
                     <Link
-                      to={`/pos/invoices/${i.id}`}
+                      to={`/sales/invoices/${i.id}`}
                       className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:border-brand/40"
                     >
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">

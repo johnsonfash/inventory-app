@@ -84,7 +84,7 @@ export default function VendorCredits() {
           <ul className="space-y-2">
             {filtered.map((r) => (
               <li key={r.id}>
-                <Link to="/purchasing/vendor-credits" className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:border-brand/40">
+                <Link to={`/purchasing/vendor-credits/${r.id.toLowerCase()}`} className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:border-brand/40">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300">
                     <FileMinus className="h-4 w-4" />
                   </span>

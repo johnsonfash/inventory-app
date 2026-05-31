@@ -8,29 +8,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
-import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
+import { StatusBadge } from "@/components/lists/status-badge"
 import { EmptyState } from "@/components/lists/empty-state"
 import { SummaryStrip } from "@/components/lists/summary-strip"
 import { AddDiscountDialog, type QuickDiscount } from "@/components/dialogs/add-discount-dialog"
-
-type Row = {
-  code: string
-  type: "percent" | "flat"
-  value: number
-  uses: number
-  cap?: number
-  status: "active" | "scheduled" | "expired"
-}
-
-const SEED_DISCOUNTS: Row[] = [
-  { code: "SUMMER20", type: "percent", value: 20, uses: 142, cap: 500, status: "active" },
-  { code: "WELCOME10", type: "percent", value: 10, uses: 412, status: "active" },
-  { code: "BLACKFRI", type: "percent", value: 30, uses: 0, cap: 1000, status: "scheduled" },
-  { code: "VIP25", type: "flat", value: 25, uses: 84, cap: 200, status: "active" },
-  { code: "WINTER15", type: "percent", value: 15, uses: 220, status: "expired" },
-]
-
-const tone: Record<Row["status"], StatusTone> = { active: "success", scheduled: "info", expired: "neutral" }
+import { SEED_DISCOUNTS, DISCOUNT_TONE as tone, type DiscountRow as Row } from "./data"
 
 export default function Discounts() {
   const isMobile = useIsMobile()
@@ -101,7 +83,7 @@ export default function Discounts() {
           <ul className="space-y-2">
             {filtered.map((r) => (
               <li key={r.code}>
-                <Link to="/sales/discounts" className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+                <Link to={`/sales/discounts/${encodeURIComponent(r.code)}`} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand dark:bg-primary/15 dark:text-primary">
                     <TicketPercent className="h-4 w-4" />
                   </span>
@@ -132,6 +114,7 @@ export default function Discounts() {
                   <th className="px-3 py-2.5 text-right font-medium">Uses</th>
                   <th className="px-3 py-2.5 text-right font-medium">Cap</th>
                   <th className="px-3 py-2.5 font-medium">Status</th>
+                  <th className="px-3 py-2.5 text-right font-medium" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -142,6 +125,9 @@ export default function Discounts() {
                     <td className="px-3 py-2.5 text-right tabular-nums">{r.uses}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{r.cap ?? "—"}</td>
                     <td className="px-3 py-2.5"><StatusBadge tone={tone[r.status]} withDot>{r.status}</StatusBadge></td>
+                    <td className="px-3 py-2.5 text-right">
+                      <Button size="sm" variant="ghost" asChild><Link to={`/sales/discounts/${encodeURIComponent(r.code)}`}>Open</Link></Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

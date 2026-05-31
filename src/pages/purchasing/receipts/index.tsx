@@ -85,7 +85,7 @@ export default function Receipts() {
               const pct = Math.round((r.receivedItems / Math.max(1, r.items)) * 100)
               return (
                 <li key={r.id}>
-                  <Link to="/purchasing/receipts" className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:border-brand/40">
+                  <Link to={`/purchasing/receipts/${r.id.toLowerCase()}`} className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:border-brand/40">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
                       <Box className="h-4 w-4" />
                     </span>

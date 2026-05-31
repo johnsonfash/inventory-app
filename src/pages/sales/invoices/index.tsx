@@ -149,7 +149,7 @@ export default function Invoices() {
                     { label: "Pay", tone: "primary", icon: <CreditCard className="h-4 w-4" />, onPress: () => {} },
                   ]}
                 >
-                  <Link to="/sales/invoices" className="flex items-center gap-3 p-3">
+                  <Link to={`/sales/invoices/${r.id}`} className="flex items-center gap-3 p-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <p className="truncate text-sm font-semibold">{r.customer}</p>
@@ -193,7 +193,7 @@ export default function Invoices() {
                     <td className="px-3 py-2.5"><StatusBadge tone={statusTone[r.status]} withDot>{r.status}</StatusBadge></td>
                     <td className="px-3 py-2.5 text-muted-foreground">{r.due}</td>
                     <td className="px-3 py-2.5 text-right">
-                      <Button size="sm" variant="ghost" asChild><Link to="/sales/invoices">Open</Link></Button>
+                      <Button size="sm" variant="ghost" asChild><Link to={`/sales/invoices/${r.id}`}>Open</Link></Button>
                     </td>
                   </tr>
                 ))}
