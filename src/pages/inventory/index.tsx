@@ -13,6 +13,7 @@ import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
@@ -159,6 +160,7 @@ export default function InventoryItems() {
   const { formatPrice } = useCurrency()
   const [query, setQuery] = React.useState("")
   const [filterOpen, setFilterOpen] = React.useState(false)
+  const [viewItem, setViewItem] = React.useState<Item | null>(null)
 
   const [stagedCategories, setStagedCategories] = React.useState<string[]>([])
   const [stagedStock, setStagedStock] = React.useState<StockFilter>("all")
@@ -318,11 +320,49 @@ export default function InventoryItems() {
             </CardContent>
           </Card>
         ) : isMobile ? (
-          <MobileItemList items={filtered} formatPrice={formatPrice} />
+          <MobileItemList items={filtered} formatPrice={formatPrice} onView={setViewItem} />
         ) : (
-          <DesktopItemTable items={filtered} formatPrice={formatPrice} />
+          <DesktopItemTable items={filtered} formatPrice={formatPrice} onView={setViewItem} />
         )}
       </div>
+
+      <Dialog open={!!viewItem} onOpenChange={(o) => { if (!o) setViewItem(null) }}>
+        <DialogContent>
+          {viewItem ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{viewItem.name}</DialogTitle>
+              </DialogHeader>
+              <div className="mt-3 grid gap-3 text-sm">
+                <div className="flex items-center gap-3">
+                  <ProductThumb
+                    name={viewItem.name}
+                    image={viewItem.image}
+                    seed={viewItem.sku}
+                    className="h-14 w-14 rounded-lg border border-border"
+                    textClassName="text-sm"
+                  />
+                  <div className="min-w-0">
+                    <p className="font-mono text-xs text-muted-foreground">{viewItem.sku}</p>
+                    <p className="text-xs text-muted-foreground">{viewItem.brand} · {viewItem.unit}</p>
+                  </div>
+                </div>
+                <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                  <div><dt className="text-muted-foreground">Category</dt><dd className="font-medium">{viewItem.category}</dd></div>
+                  <div><dt className="text-muted-foreground">Location</dt><dd className="font-medium">{viewItem.location}</dd></div>
+                  <div><dt className="text-muted-foreground">Stock</dt><dd className="font-medium tabular-nums">{formatStock(viewItem.stock)} / {viewItem.reorder} reorder</dd></div>
+                  <div><dt className="text-muted-foreground">Price</dt><dd className="font-medium tabular-nums">{formatPrice(viewItem.price)}</dd></div>
+                  <div><dt className="text-muted-foreground">Warranty</dt><dd className="font-medium">{viewItem.warranty}</dd></div>
+                  <div><dt className="text-muted-foreground">Status</dt><dd className="font-medium">{stockStatus(viewItem).label}</dd></div>
+                </dl>
+                <div className="mt-2 flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setViewItem(null)}>Close</Button>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <FilterSheet
         open={filterOpen}
@@ -398,7 +438,7 @@ function SummaryStrip({
   )
 }
 
-function MobileItemList({ items, formatPrice }: { items: Item[]; formatPrice: (n: number | null | undefined) => string }) {
+function MobileItemList({ items, formatPrice, onView }: { items: Item[]; formatPrice: (n: number | null | undefined) => string; onView: (it: Item) => void }) {
   return (
     <ul className="space-y-2">
       {items.map((it) => {
@@ -422,7 +462,11 @@ function MobileItemList({ items, formatPrice }: { items: Item[]; formatPrice: (n
                 },
               ]}
             >
-              <div className="flex items-center gap-3 p-3">
+              <button
+                type="button"
+                onClick={() => onView(it)}
+                className="flex w-full items-center gap-3 p-3 text-left"
+              >
                 <ProductThumb
                   name={it.name}
                   image={it.image}
@@ -461,7 +505,7 @@ function MobileItemList({ items, formatPrice }: { items: Item[]; formatPrice: (n
                     </span>
                   </div>
                 </div>
-              </div>
+              </button>
             </SwipeableRow>
           </li>
         )
@@ -470,7 +514,7 @@ function MobileItemList({ items, formatPrice }: { items: Item[]; formatPrice: (n
   )
 }
 
-function DesktopItemTable({ items, formatPrice }: { items: Item[]; formatPrice: (n: number | null | undefined) => string }) {
+function DesktopItemTable({ items, formatPrice, onView }: { items: Item[]; formatPrice: (n: number | null | undefined) => string; onView: (it: Item) => void }) {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
       <table className="w-full text-sm">
@@ -527,9 +571,7 @@ function DesktopItemTable({ items, formatPrice }: { items: Item[]; formatPrice: 
                   </StatusBadge>
                 </td>
                 <td className="px-3 py-2.5 text-right">
-                  <Button size="sm" variant="ghost" asChild>
-                    <Link to="/inventory">View</Link>
-                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => onView(it)}>View</Button>
                 </td>
               </tr>
             )

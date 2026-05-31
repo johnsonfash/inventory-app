@@ -1,6 +1,5 @@
 import * as React from "react"
 import { ChevronRight, Package, PackageCheck, Truck } from "lucide-react"
-import { Link } from "react-router-dom"
 import { PageShell } from "@/components/page-shell"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
@@ -33,9 +32,12 @@ const statusTone: Record<Row["status"], StatusTone> = {
 
 export default function ReceiveStock() {
   const [formOpen, setFormOpen] = React.useState(false)
+  const [prefillRef, setPrefillRef] = React.useState<string>("")
   const [received, setReceived] = React.useState<StockMovement[]>(() => listStockMovements().filter((m) => m.kind === "receive"))
   const reload = React.useCallback(() => setReceived(listStockMovements().filter((m) => m.kind === "receive")), [])
   useRegisterPageRefresh(React.useCallback(async () => { reload(); await new Promise((r) => setTimeout(r, 300)) }, [reload]))
+
+  const openForPO = (po: string) => { setPrefillRef(po); setFormOpen(true) }
 
   const today = rows.filter((r) => r.status === "today").length
   const partial = rows.filter((r) => r.status === "partial").length
@@ -45,7 +47,7 @@ export default function ReceiveStock() {
     <PageShell
       title="Receive stock"
       withToolbar
-      toolbarActions={<Button onClick={() => setFormOpen(true)}><PackageCheck className="h-4 w-4" /> Receive stock</Button>}
+      toolbarActions={<Button onClick={() => { setPrefillRef(""); setFormOpen(true) }}><PackageCheck className="h-4 w-4" /> Receive stock</Button>}
       titleTooltip={
         <>
           Pending arrivals — purchase orders that have shipped from
@@ -72,9 +74,10 @@ export default function ReceiveStock() {
         <ul className="space-y-2">
           {rows.map((r) => (
             <li key={r.po}>
-              <Link
-                to="/purchasing/pos"
-                className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:border-brand/40"
+              <button
+                type="button"
+                onClick={() => openForPO(r.po)}
+                className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left transition-colors hover:border-brand/40"
               >
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300">
                   <Truck className="h-4 w-4" />
@@ -89,7 +92,7 @@ export default function ReceiveStock() {
                   </p>
                 </div>
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </Link>
+              </button>
             </li>
           ))}
         </ul>
@@ -123,18 +126,18 @@ export default function ReceiveStock() {
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="max-w-sm">
-          <ReceiveForm onDone={() => { reload(); setFormOpen(false) }} onCancel={() => setFormOpen(false)} />
+          <ReceiveForm initialRef={prefillRef} onDone={() => { reload(); setFormOpen(false) }} onCancel={() => setFormOpen(false)} />
         </DialogContent>
       </Dialog>
     </PageShell>
   )
 }
 
-function ReceiveForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
+function ReceiveForm({ initialRef = "", onDone, onCancel }: { initialRef?: string; onDone: () => void; onCancel: () => void }) {
   const catalog = React.useMemo(() => loadAllCatalog(), [])
   const [sku, setSku] = React.useState("")
   const [qty, setQty] = React.useState("")
-  const [ref, setRef] = React.useState("")
+  const [ref, setRef] = React.useState(initialRef)
   const [location, setLocation] = React.useState("")
 
   const match = catalog.find((c) => c.sku.toLowerCase() === sku.trim().toLowerCase())

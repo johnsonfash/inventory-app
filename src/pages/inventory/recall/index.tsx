@@ -1,9 +1,11 @@
 import * as React from "react"
+import { toast } from "sonner"
 import { AlertTriangle, ArrowRight, Boxes, FileSearch, Search, ShieldAlert, Workflow } from "lucide-react"
 import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import { EmptyState } from "@/components/lists/empty-state"
 import { StatusBadge } from "@/components/lists/status-badge"
@@ -78,6 +80,8 @@ function traceLot(lot: LotEntry): TraceResult {
 export default function RecallTrace() {
   const [query, setQuery] = React.useState("")
   const [selectedLotId, setSelectedLotId] = React.useState<string | null>(null)
+  const [initiated, setInitiated] = React.useState(false)
+  const [confirm, setConfirm] = React.useState<"initiate" | "notify" | "writeoff" | null>(null)
   useRegisterPageRefresh(React.useCallback(async () => { await new Promise((r) => setTimeout(r, 300)) }, []))
 
   const lots = React.useMemo(() => loadLots(), [])
@@ -338,9 +342,15 @@ export default function RecallTrace() {
             </Card>
 
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline">Mark recall as initiated</Button>
-              <Button variant="outline">Notify affected customers</Button>
-              <Button variant="outline">Generate adjustment write-off</Button>
+              <Button variant="outline" onClick={() => setConfirm("initiate")} disabled={initiated}>
+                {initiated ? "Recall initiated" : "Mark recall as initiated"}
+              </Button>
+              <Button variant="outline" onClick={() => setConfirm("notify")} disabled={!result || result.affectedInvoices.length === 0}>
+                Notify affected customers
+              </Button>
+              <Button variant="outline" onClick={() => setConfirm("writeoff")} disabled={!result}>
+                Generate adjustment write-off
+              </Button>
             </div>
 
             <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-3 text-xs text-muted-foreground">
@@ -356,6 +366,50 @@ export default function RecallTrace() {
           </>
         )}
       </div>
+
+      <Dialog open={!!confirm} onOpenChange={(o) => { if (!o) setConfirm(null) }}>
+        <DialogContent>
+          {confirm === "initiate" ? (
+            <>
+              <DialogHeader><DialogTitle>Initiate recall?</DialogTitle></DialogHeader>
+              <p className="mt-2 text-sm">
+                This stamps the recall as initiated and starts the
+                audit clock. You can still notify customers and
+                generate write-offs afterwards.
+              </p>
+              <div className="mt-4 flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setConfirm(null)}>Cancel</Button>
+                <Button onClick={() => { setInitiated(true); setConfirm(null); toast.success("Recall initiated and logged") }}>Initiate</Button>
+              </div>
+            </>
+          ) : confirm === "notify" ? (
+            <>
+              <DialogHeader><DialogTitle>Notify affected customers?</DialogTitle></DialogHeader>
+              <p className="mt-2 text-sm">
+                Pallio will email the {result?.affectedInvoices.length ?? 0} customer{(result?.affectedInvoices.length ?? 0) === 1 ? "" : "s"} on
+                affected invoices using the "Recall notice" template.
+              </p>
+              <div className="mt-4 flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setConfirm(null)}>Cancel</Button>
+                <Button onClick={() => { setConfirm(null); toast.success(`Notifications queued for ${result?.affectedInvoices.length ?? 0} customer${(result?.affectedInvoices.length ?? 0) === 1 ? "" : "s"}`) }}>Send</Button>
+              </div>
+            </>
+          ) : confirm === "writeoff" ? (
+            <>
+              <DialogHeader><DialogTitle>Generate write-off?</DialogTitle></DialogHeader>
+              <p className="mt-2 text-sm">
+                Creates a draft inventory adjustment removing the
+                recalled lot quantity from on-hand stock. You can review
+                and post it from Inventory → Adjustments.
+              </p>
+              <div className="mt-4 flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setConfirm(null)}>Cancel</Button>
+                <Button onClick={() => { setConfirm(null); toast.success("Draft adjustment created in Inventory → Adjustments") }}>Generate</Button>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </PageShell>
   )
 }

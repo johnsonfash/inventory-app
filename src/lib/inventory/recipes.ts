@@ -449,6 +449,28 @@ export function loadProductionRuns(): ProductionRun[] {
   return kvJson.get<ProductionRun[]>(RUNS_KEY) ?? SEED_RUNS
 }
 
+// Append a freshly-logged run. Stored alongside the seed runs in kv
+// so subsequent reads pick it up. Backend will replace this with a
+// POST /production/runs call.
+export function recordProductionRun(input: Omit<ProductionRun, "id" | "ranAt"> & Partial<Pick<ProductionRun, "id" | "ranAt">>): ProductionRun {
+  const run: ProductionRun = {
+    id: input.id ?? `run-${Date.now().toString(36)}`,
+    ranAt: input.ranAt ?? new Date().toISOString(),
+    recipeId: input.recipeId,
+    parentSku: input.parentSku,
+    batches: input.batches,
+    lotCode: input.lotCode,
+    expiresAt: input.expiresAt,
+    locationId: input.locationId,
+    runById: input.runById,
+    note: input.note,
+    committed: input.committed,
+  }
+  const next = [run, ...loadProductionRuns()]
+  kvJson.set(RUNS_KEY, next)
+  return run
+}
+
 export function loadLots(): LotEntry[] {
   return kvJson.get<LotEntry[]>(LOTS_KEY) ?? SEED_LOTS
 }

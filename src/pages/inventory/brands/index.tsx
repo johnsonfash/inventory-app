@@ -5,6 +5,7 @@ import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import { EmptyState } from "@/components/lists/empty-state"
 import { SummaryStrip } from "@/components/lists/summary-strip"
@@ -58,6 +59,7 @@ export default function Brands() {
   const [query, setQuery] = React.useState("")
   const { formatPrice } = useCurrency()
   const [rows, setRows] = React.useState<Row[]>(() => deriveBrands())
+  const [active, setActive] = React.useState<Row | null>(null)
 
   useRegisterPageRefresh(React.useCallback(async () => { setRows(deriveBrands()); await new Promise((r) => setTimeout(r, 300)) }, []))
 
@@ -110,10 +112,11 @@ export default function Brands() {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((r) => (
-              <Link
+              <button
                 key={r.name}
-                to="/inventory/brands"
-                className="group rounded-2xl border border-border bg-card p-4 transition-all hover:border-brand/40 hover:shadow-sm"
+                type="button"
+                onClick={() => setActive(r)}
+                className="group rounded-2xl border border-border bg-card p-4 text-left transition-all hover:border-brand/40 hover:shadow-sm"
               >
                 <div className="flex items-start gap-3">
                   <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${avatarTint(r.name)}`}>
@@ -128,11 +131,41 @@ export default function Brands() {
                   <p className="text-lg font-bold tabular-nums">{formatPrice(r.revenue)}</p>
                   <p className="text-[11px] text-muted-foreground">{r.skus} SKUs</p>
                 </div>
-              </Link>
+              </button>
             ))}
           </div>
         )}
       </div>
+
+      <Dialog open={!!active} onOpenChange={(o) => { if (!o) setActive(null) }}>
+        <DialogContent>
+          {active ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{active.name}</DialogTitle>
+              </DialogHeader>
+              <div className="mt-3 grid gap-3 text-sm">
+                <div className="flex items-center gap-3">
+                  <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-base font-bold ${avatarTint(active.name)}`}>
+                    {initialsOf(active.name)}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Top category</p>
+                    <p className="font-medium">{active.category}</p>
+                  </div>
+                </div>
+                <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                  <div><dt className="text-muted-foreground">SKUs</dt><dd className="font-medium tabular-nums">{active.skus.toLocaleString()}</dd></div>
+                  <div><dt className="text-muted-foreground">Stock value</dt><dd className="font-medium tabular-nums">{formatPrice(active.revenue)}</dd></div>
+                </dl>
+                <div className="mt-2 flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setActive(null)}>Close</Button>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </PageShell>
   )
 }

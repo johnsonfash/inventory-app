@@ -1,10 +1,12 @@
 import * as React from "react"
 import { Link } from "react-router-dom"
+import { toast } from "sonner"
 import { Edit3, Plus, Ruler, Search, Trash2 } from "lucide-react"
 import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import { EmptyState } from "@/components/lists/empty-state"
 import { StatusBadge } from "@/components/lists/status-badge"
@@ -30,7 +32,31 @@ function deriveUnits(): Row[] {
 export default function Units() {
   const [query, setQuery] = React.useState("")
   const [rows, setRows] = React.useState<Row[]>(() => deriveUnits())
+  const [editRow, setEditRow] = React.useState<Row | null>(null)
+  const [editName, setEditName] = React.useState("")
+  const [deleteRow, setDeleteRow] = React.useState<Row | null>(null)
   useRegisterPageRefresh(React.useCallback(async () => { setRows(deriveUnits()); await new Promise((r) => setTimeout(r, 300)) }, []))
+
+  const openEdit = (r: Row) => { setEditRow(r); setEditName(r.name) }
+  const saveEdit = () => {
+    if (!editRow) return
+    const name = editName.trim()
+    if (!name) { toast.error("Name can't be empty"); return }
+    setRows((p) => p.map((x) => (x.code === editRow.code ? { ...x, name } : x)))
+    toast.success(`Unit "${editRow.code}" updated`)
+    setEditRow(null)
+  }
+  const confirmDelete = () => {
+    if (!deleteRow) return
+    if (deleteRow.skus > 0) {
+      toast.error(`Can't delete — ${deleteRow.skus} item${deleteRow.skus === 1 ? "" : "s"} still use ${deleteRow.code}`)
+      setDeleteRow(null)
+      return
+    }
+    setRows((p) => p.filter((x) => x.code !== deleteRow.code))
+    toast.success(`Unit "${deleteRow.code}" removed`)
+    setDeleteRow(null)
+  }
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -95,8 +121,8 @@ export default function Units() {
                   {r.baseFor && <p className="mt-0.5 text-[11px] text-muted-foreground">{r.baseFor}</p>}
                   <p className="mt-0.5 text-[11px] text-muted-foreground">{r.skus.toLocaleString()} items</p>
                   <div className="mt-2 flex items-center gap-1">
-                    <Button size="sm" variant="ghost" aria-label="Edit"><Edit3 className="h-3.5 w-3.5" aria-hidden="true" /></Button>
-                    <Button size="sm" variant="ghost" aria-label="Delete"><Trash2 className="h-3.5 w-3.5" aria-hidden="true" /></Button>
+                    <Button size="sm" variant="ghost" aria-label="Edit" onClick={() => openEdit(r)}><Edit3 className="h-3.5 w-3.5" aria-hidden="true" /></Button>
+                    <Button size="sm" variant="ghost" aria-label="Delete" onClick={() => setDeleteRow(r)}><Trash2 className="h-3.5 w-3.5" aria-hidden="true" /></Button>
                   </div>
                 </div>
               </div>
@@ -104,6 +130,58 @@ export default function Units() {
           </div>
         )}
       </div>
+
+      <Dialog open={!!editRow} onOpenChange={(o) => { if (!o) setEditRow(null) }}>
+        <DialogContent>
+          {editRow ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Edit unit</DialogTitle>
+              </DialogHeader>
+              <div className="mt-3 flex flex-col gap-3">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-muted-foreground">Code</span>
+                  <Input value={editRow.code} disabled />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-muted-foreground">Name</span>
+                  <Input value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus />
+                </label>
+                <div className="mt-2 flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setEditRow(null)}>Cancel</Button>
+                  <Button onClick={saveEdit}>Save</Button>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleteRow} onOpenChange={(o) => { if (!o) setDeleteRow(null) }}>
+        <DialogContent>
+          {deleteRow ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Delete unit?</DialogTitle>
+              </DialogHeader>
+              <div className="mt-3 flex flex-col gap-3 text-sm">
+                <p>
+                  Remove <span className="font-semibold">{deleteRow.name}</span> (<span className="font-mono">{deleteRow.code}</span>)?
+                </p>
+                {deleteRow.skus > 0 ? (
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    {deleteRow.skus.toLocaleString()} item{deleteRow.skus === 1 ? "" : "s"} still use this unit — deletion will be blocked.
+                  </p>
+                ) : null}
+                <div className="mt-2 flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setDeleteRow(null)}>Cancel</Button>
+                  <Button onClick={confirmDelete}>Delete</Button>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </PageShell>
   )
 }

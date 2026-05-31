@@ -1,4 +1,5 @@
 import * as React from "react"
+import { toast } from "sonner"
 import { Printer, ScanLine, Search, Tag } from "lucide-react"
 import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
@@ -47,6 +48,17 @@ export default function LabelPrint() {
   const toggle = (sku: string) =>
     setItems((p) => p.map((i) => (i.sku === sku ? { ...i, checked: !i.checked } : i)))
 
+  const print = () => {
+    if (totalLabels === 0) return
+    // Hand off to the browser's native print dialog. Once a label
+    // printer is configured (Settings → Printers), the backend will
+    // route this through the thermal-printer plugin instead.
+    toast.success(`Queued ${totalLabels} label${totalLabels === 1 ? "" : "s"} for printing`)
+    if (typeof window !== "undefined") {
+      try { window.print() } catch { /* print blocked — toast already informed user */ }
+    }
+  }
+
   return (
     <PageShell
       title="Print labels"
@@ -83,7 +95,7 @@ export default function LabelPrint() {
               <SelectItem value="full">Full (logo + price)</SelectItem>
             </SelectContent>
           </Select>
-          <Button disabled={totalLabels === 0}>
+          <Button disabled={totalLabels === 0} onClick={print}>
             <Printer className="h-4 w-4" /> Print {totalLabels || ""}
           </Button>
         </div>

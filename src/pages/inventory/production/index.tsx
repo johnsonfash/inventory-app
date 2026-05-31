@@ -1,22 +1,31 @@
 import * as React from "react"
 import { Link } from "react-router-dom"
-import { Calendar, ChevronRight, Factory, Play, Search } from "lucide-react"
+import { toast } from "sonner"
+import { Calendar, Factory, Play, Search } from "lucide-react"
 import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import { EmptyState } from "@/components/lists/empty-state"
 import { StatusBadge } from "@/components/lists/status-badge"
 import { SummaryStrip } from "@/components/lists/summary-strip"
-import { loadProductionRuns, loadRecipes } from "@/lib/inventory/recipes"
+import { loadProductionRuns, loadRecipes, recordProductionRun } from "@/lib/inventory/recipes"
 
 export default function ProductionIndex() {
   const [query, setQuery] = React.useState("")
   const [tab, setTab] = React.useState<"runs" | "schedule">("runs")
-  useRegisterPageRefresh(React.useCallback(async () => { await new Promise((r) => setTimeout(r, 400)) }, []))
+  const [logOpen, setLogOpen] = React.useState(false)
+  const [logRecipeId, setLogRecipeId] = React.useState<string>("")
+  const [logBatches, setLogBatches] = React.useState<string>("1")
+  const [logLotCode, setLogLotCode] = React.useState<string>("")
+  const [logNote, setLogNote] = React.useState<string>("")
+  const [runsTick, setRunsTick] = React.useState(0)
+  useRegisterPageRefresh(React.useCallback(async () => { setRunsTick((t) => t + 1); await new Promise((r) => setTimeout(r, 400)) }, []))
 
-  const runs = React.useMemo(() => loadProductionRuns(), [])
+  const runs = React.useMemo(() => loadProductionRuns(), [runsTick])
   const recipes = React.useMemo(() => loadRecipes(), [])
   const recipeById = React.useMemo(() => {
     const m = new Map(recipes.map((r) => [r.id, r]))
@@ -93,7 +102,7 @@ export default function ProductionIndex() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by SKU, lot, or recipe name…" className="pl-9" />
           </div>
-          <Button className="hidden md:inline-flex">
+          <Button className="hidden md:inline-flex" onClick={() => { setLogRecipeId(recipes[0]?.id ?? ""); setLogBatches("1"); setLogLotCode(""); setLogNote(""); setLogOpen(true) }}>
             <Play className="h-4 w-4" /> Log run
           </Button>
         </div>
@@ -149,6 +158,65 @@ export default function ProductionIndex() {
             </ul>
           )
         )}
+
+        <Dialog open={logOpen} onOpenChange={setLogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Log production run</DialogTitle>
+            </DialogHeader>
+            <div className="mt-3 flex flex-col gap-3">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-muted-foreground">Recipe</span>
+                <Select value={logRecipeId} onValueChange={setLogRecipeId}>
+                  <SelectTrigger><SelectValue placeholder="Pick a recipe" /></SelectTrigger>
+                  <SelectContent>
+                    {recipes.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>{r.name} <span className="text-muted-foreground">· {r.parentSku}</span></SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-muted-foreground">Batches</span>
+                  <Input type="number" min={1} value={logBatches} onChange={(e) => setLogBatches(e.target.value)} />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-muted-foreground">Lot code (opt)</span>
+                  <Input value={logLotCode} onChange={(e) => setLogLotCode(e.target.value)} placeholder="auto if blank" />
+                </label>
+              </div>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-muted-foreground">Note (optional)</span>
+                <Input value={logNote} onChange={(e) => setLogNote(e.target.value)} placeholder="e.g. substituted X for Y" />
+              </label>
+              <div className="mt-2 flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setLogOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => {
+                    const rec = recipes.find((r) => r.id === logRecipeId)
+                    const batches = Math.max(1, Number(logBatches) || 0)
+                    if (!rec) { toast.error("Pick a recipe first"); return }
+                    recordProductionRun({
+                      recipeId: rec.id,
+                      parentSku: rec.parentSku,
+                      batches,
+                      lotCode: logLotCode.trim() || undefined,
+                      runById: "m-1",
+                      note: logNote.trim() || undefined,
+                      committed: true,
+                    })
+                    toast.success(`Logged ${batches} batch${batches === 1 ? "" : "es"} of ${rec.name}`)
+                    setLogOpen(false)
+                    setRunsTick((t) => t + 1)
+                  }}
+                >
+                  Log run
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {tab === "schedule" && (
           <Card>

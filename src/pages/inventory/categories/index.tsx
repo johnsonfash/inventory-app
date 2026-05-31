@@ -5,6 +5,7 @@ import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import { EmptyState } from "@/components/lists/empty-state"
 import { SummaryStrip } from "@/components/lists/summary-strip"
@@ -75,6 +76,7 @@ function buildRows(): Row[] {
 export default function Categories() {
   const [query, setQuery] = React.useState("")
   const { formatPrice } = useCurrency()
+  const [active, setActive] = React.useState<Row | null>(null)
 
   useRegisterPageRefresh(React.useCallback(async () => { await new Promise((r) => setTimeout(r, 400)) }, []))
 
@@ -139,10 +141,11 @@ export default function Categories() {
               // — always meaningful regardless of sales history.
               const pct = totalValue > 0 ? Math.round((r.value / totalValue) * 100) : 0
               return (
-                <Link
+                <button
                   key={r.name}
-                  to="/inventory/categories"
-                  className="group rounded-2xl border border-border bg-card p-4 transition-all hover:border-brand/40 hover:shadow-sm"
+                  type="button"
+                  onClick={() => setActive(r)}
+                  className="group rounded-2xl border border-border bg-card p-4 text-left transition-all hover:border-brand/40 hover:shadow-sm"
                 >
                   <div className="flex items-start gap-3">
                     <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", TINTS[r.tone] ?? TINTS[0])}>
@@ -170,12 +173,45 @@ export default function Categories() {
                       <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{pct}%</span>
                     </div>
                   </div>
-                </Link>
+                </button>
               )
             })}
           </div>
         )}
       </div>
+
+      <Dialog open={!!active} onOpenChange={(o) => { if (!o) setActive(null) }}>
+        <DialogContent>
+          {active ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{active.name}</DialogTitle>
+              </DialogHeader>
+              <div className="mt-3 grid gap-3 text-sm">
+                <div className="flex items-center gap-3">
+                  <span className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl", TINTS[active.tone] ?? TINTS[0])}>
+                    <Layers className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Category</p>
+                    <p className="font-medium">{active.name}</p>
+                  </div>
+                </div>
+                <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                  <div><dt className="text-muted-foreground">SKUs</dt><dd className="font-medium tabular-nums">{active.skus.toLocaleString()}</dd></div>
+                  <div><dt className="text-muted-foreground">Stock value</dt><dd className="font-medium tabular-nums">{formatPrice(active.value)}</dd></div>
+                  {active.revenue > 0 ? (
+                    <div className="col-span-2"><dt className="text-muted-foreground">Revenue</dt><dd className="font-medium tabular-nums">{formatPrice(active.revenue)}</dd></div>
+                  ) : null}
+                </dl>
+                <div className="mt-2 flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setActive(null)}>Close</Button>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </PageShell>
   )
 }
