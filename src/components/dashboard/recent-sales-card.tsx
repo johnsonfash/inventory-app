@@ -62,7 +62,7 @@ export function RecentSalesCard() {
             return (
               <li key={s.id}>
                 <Link
-                  to={`/pos/invoices/${s.id}`}
+                  to="/pos/transactions"
                   className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:bg-accent/30 -mx-2 px-2 rounded-lg"
                 >
                   <span

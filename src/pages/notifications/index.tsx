@@ -18,6 +18,7 @@ import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import { EmptyState } from "@/components/lists/empty-state"
 import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
 import { SwitchField } from "@/components/forms/switch-field"
+import { kvJson } from "@/lib/storage/kv"
 import { cn } from "@/lib/utils"
 import { formatPriceFor } from "@/contexts/currency"
 
@@ -73,10 +74,22 @@ function relTime(min: number) {
   return `${Math.floor(h / 24)}d ago`
 }
 
+const READ_OVERRIDES_KEY = "pallio:notifications-read"
+
+function applyReadOverrides(base: Notification[], overrides: Record<string, boolean>): Notification[] {
+  return base.map((n) => (n.id in overrides ? { ...n, read: overrides[n.id]! } : n))
+}
+
 export default function Notifications() {
-  const [items, setItems] = React.useState<Notification[]>(seed)
+  // Persist read/unread state across reloads so the toggle "sticks".
+  // Until backend lands the seed dataset is fixed, so we only need
+  // to remember per-id overrides, not the whole feed.
+  const [items, setItems] = React.useState<Notification[]>(() =>
+    applyReadOverrides(seed, kvJson.get<Record<string, boolean>>(READ_OVERRIDES_KEY) ?? {}),
+  )
   const [filter, setFilter] = React.useState<(typeof FILTERS)[number]>("All")
   const [showSettings, setShowSettings] = React.useState(false)
+  const [persisting, setPersisting] = React.useState(false)
 
   useRegisterPageRefresh(React.useCallback(async () => { await new Promise((r) => setTimeout(r, 400)) }, []))
 
@@ -88,10 +101,25 @@ export default function Notifications() {
 
   const unread = items.filter((n) => !n.read).length
 
+  const persistOverrides = React.useCallback((next: Notification[]) => {
+    const overrides: Record<string, boolean> = {}
+    for (const n of next) overrides[n.id] = n.read
+    setPersisting(true)
+    void kvJson.set(READ_OVERRIDES_KEY, overrides).finally(() => setPersisting(false))
+  }, [])
+
   const markAllRead = () =>
-    setItems((p) => p.map((n) => ({ ...n, read: true })))
+    setItems((p) => {
+      const next = p.map((n) => ({ ...n, read: true }))
+      persistOverrides(next)
+      return next
+    })
   const toggleRead = (id: string) =>
-    setItems((p) => p.map((n) => (n.id === id ? { ...n, read: !n.read } : n)))
+    setItems((p) => {
+      const next = p.map((n) => (n.id === id ? { ...n, read: !n.read } : n))
+      persistOverrides(next)
+      return next
+    })
 
   return (
     <PageShell
@@ -125,8 +153,12 @@ export default function Notifications() {
             <button
               type="button"
               onClick={markAllRead}
-              disabled={unread === 0}
-              className="inline-flex h-9 items-center gap-1 rounded-md border border-border bg-card px-3 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={unread === 0 || persisting}
+              aria-busy={persisting}
+              className={cn(
+                "inline-flex h-9 items-center gap-1 rounded-md border border-border bg-card px-3 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50",
+                persisting && "opacity-60",
+              )}
             >
               <CheckCheck className="h-3.5 w-3.5" /> Mark all read
             </button>
@@ -228,7 +260,12 @@ export default function Notifications() {
                         <button
                           type="button"
                           onClick={() => toggleRead(n.id)}
-                          className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                          disabled={persisting}
+                          aria-busy={persisting}
+                          className={cn(
+                            "text-[11px] font-medium text-muted-foreground hover:text-foreground disabled:cursor-not-allowed",
+                            persisting && "opacity-60",
+                          )}
                         >
                           Mark as {n.read ? "unread" : "read"}
                         </button>

@@ -1,5 +1,6 @@
 import * as React from "react"
 import { Paperclip, Receipt, Tag } from "lucide-react"
+import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -12,8 +13,24 @@ import { FormAside } from "@/components/forms/form-aside"
 import { InputAddon } from "@/components/forms/input-addon"
 import { SwitchField } from "@/components/forms/switch-field"
 
+const MAX_RECEIPT_BYTES = 8 * 1024 * 1024 // 8MB — matches the hint
+
 export default function NewExpense() {
   const [submitting, setSubmitting] = React.useState(false)
+  const [receiptName, setReceiptName] = React.useState<string | null>(null)
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
+
+  const onReceiptChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) { setReceiptName(null); return }
+    if (file.size > MAX_RECEIPT_BYTES) {
+      toast.error("Receipt too large", { description: "Max 8MB. Try a compressed photo or PDF." })
+      e.target.value = ""
+      setReceiptName(null)
+      return
+    }
+    setReceiptName(file.name)
+  }
 
   return (
     <FormShell
@@ -119,7 +136,17 @@ export default function NewExpense() {
             hint="PNG, JPG, or PDF — max 8MB."
             tooltip="A photo of the paper receipt or the email PDF. Pallio stores it forever — when the tax man comes asking, this is your proof the expense is real."
           >
-            <Input type="file" accept="image/*,application/pdf" />
+            <Input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={onReceiptChange}
+            />
+            {receiptName && (
+              <p className="mt-1.5 truncate text-[11px] text-muted-foreground">
+                Attached: <span className="font-medium text-foreground">{receiptName}</span>
+              </p>
+            )}
           </FormField>
           <FormField>
             <SwitchField

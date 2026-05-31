@@ -170,7 +170,17 @@ export default function AffiliateDashboard() {
             { label: "This month's earnings", value: formatPrice(mtdCommission),  tone: "success", hint: "ready or pending" },
             { label: "Attributed sales (MTD)", value: formatPrice(mtdSales),       tone: "brand",   hint: "what your link drove" },
             { label: "Pending payout",         value: formatPrice(pendingTotal),   tone: "warning", hint: "approved + holding" },
-            { label: "Click → buy %",          value: `${conv}%`,                  tone: "info",    hint: `${me.affiliateClicks?.toLocaleString() ?? 0} clicks` },
+            {
+              label: "Click → buy %",
+              value: `${conv}%`,
+              tone: "info",
+              // When clicks exist but no order has converted yet, hint
+              // that attribution can lag a few hours rather than letting
+              // the 0% read as a data bug.
+              hint: conv === 0 && (me.affiliateClicks ?? 0) > 0
+                ? `${me.affiliateClicks?.toLocaleString() ?? 0} clicks · attribution may be pending`
+                : `${me.affiliateClicks?.toLocaleString() ?? 0} clicks`,
+            },
           ]}
         />
 

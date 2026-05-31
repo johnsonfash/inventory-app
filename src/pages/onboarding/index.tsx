@@ -129,6 +129,9 @@ export default function OnboardingHub() {
             <div className="flex items-start gap-4">
               {/* Progress ring */}
               <div className="relative h-20 w-20 shrink-0">
+                {/* 100x100 viewBox; cx/cy=50 centers; r=42 leaves room for
+                    the 9-unit stroke. Circumference 2π·42 ≈ 264 — used as
+                    the dasharray base so (pct/100)*264 fills proportionally. */}
                 <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
                   <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeOpacity="0.18" strokeWidth="9" />
                   <circle

@@ -140,10 +140,17 @@ export default function Appointments() {
   const confirmReject = () => {
     if (!rejectFor) return
     const t = rejectFor
-    setTimeOff((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: "rejected", decisionNote: rejectNote.trim() || undefined } : x)))
-    toast(`Leave rejected`, { description: `${t.staff} has been notified.` })
-    setRejectFor(null)
-    setRejectNote("")
+    try {
+      setTimeOff((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: "rejected", decisionNote: rejectNote.trim() || undefined } : x)))
+      toast(`Leave rejected`, { description: `${t.staff} has been notified.` })
+      setRejectFor(null)
+      setRejectNote("")
+    } catch {
+      // Defensive: when this flows through a backend the state update
+      // could throw or the server could reject — keep the sheet open
+      // and surface the failure rather than silently dismissing.
+      toast.error("Couldn't reject the request", { description: "Try again in a moment." })
+    }
   }
 
   // ISO date → staff on approved leave that day (drives calendar markers

@@ -1,5 +1,6 @@
 import * as React from "react"
 import { Link } from "react-router-dom"
+import { toast } from "sonner"
 import { Building2, ChevronRight, Plus, Receipt, Search, Wallet } from "lucide-react"
 import { PageShell } from "@/components/page-shell"
 import { MobileFab } from "@/components/mobile/mobile-fab"
@@ -48,10 +49,11 @@ export default function Expenses() {
   const [addOpen, setAddOpen] = React.useState(false)
 
   const handleCreate = (e: QuickExpense) => {
-    setRows((prev) => [
-      { id: `EXP-${Math.floor(1000 + Math.random() * 9000)}`, ...e },
-      ...prev,
-    ])
+    const id = `EXP-${Math.floor(1000 + Math.random() * 9000)}`
+    setRows((prev) => [{ id, ...e }, ...prev])
+    // Mirror the desktop button: confirm the entry landed so the
+    // mobile FAB flow doesn't leave the user wondering.
+    toast.success("Expense logged", { description: `${id} · ${formatPrice(e.amount)}` })
   }
 
   useRegisterPageRefresh(React.useCallback(async () => { await new Promise((r) => setTimeout(r, 400)) }, []))
