@@ -1,4 +1,6 @@
 import * as React from "react"
+import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import { CalendarDays, TicketPercent, Users } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -15,6 +17,7 @@ import { InputAddon } from "@/components/forms/input-addon"
 export default function NewDiscount() {
   const [submitting, setSubmitting] = React.useState(false)
   const [type, setType] = React.useState<"percent" | "flat">("percent")
+  const navigate = useNavigate()
 
   return (
     <FormShell
@@ -29,7 +32,14 @@ export default function NewDiscount() {
         </>
       }
       backHref="/sales/discounts"
-      onSubmit={() => { setSubmitting(true); setTimeout(() => setSubmitting(false), 500) }}
+      onSubmit={() => {
+        setSubmitting(true)
+        setTimeout(() => {
+          setSubmitting(false)
+          toast.success("Discount code saved.")
+          navigate("/sales/discounts")
+        }, 500)
+      }}
       aside={
         <FormAside
           tips={[

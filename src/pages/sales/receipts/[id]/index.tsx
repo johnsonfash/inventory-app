@@ -19,7 +19,36 @@ export default function ReceiptDetail() {
   const receipt = getReceipt(params.id ?? "")
   const invoice = receipt ? getInvoice(receipt.invoiceId) : undefined
   const { formatPrice: fmtMoney } = useCurrency()
+  const [pdfBusy, setPdfBusy] = React.useState(false)
   useRegisterPageRefresh(React.useCallback(async () => { await new Promise((r) => setTimeout(r, 300)) }, []))
+
+  const onDownloadPdf = async () => {
+    if (!receipt) return
+    setPdfBusy(true)
+    try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ])
+      const el = document.getElementById("receipt-print-body") as HTMLElement | null
+      if (!el) {
+        toast.error("Couldn't find receipt body to export.")
+        return
+      }
+      const canvas = await html2canvas(el, { scale: 2, useCORS: true })
+      const imgData = canvas.toDataURL("image/png")
+      const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" })
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const ratio = pageWidth / canvas.width
+      pdf.addImage(imgData, "PNG", 0, 20, pageWidth, canvas.height * ratio)
+      pdf.save(`${receipt.number}.pdf`)
+      toast.success("Receipt PDF downloaded.")
+    } catch {
+      toast.error("Couldn't generate PDF. Try Print instead.")
+    } finally {
+      setPdfBusy(false)
+    }
+  }
 
   if (!receipt || !invoice) {
     return (
@@ -88,14 +117,14 @@ export default function ReceiptDetail() {
             <Button variant="outline" onClick={() => window.print()}>
               <Printer className="h-4 w-4" /> Print
             </Button>
-            <Button variant="outline" onClick={() => toast.success("Receipt PDF will land when the backend ships.")}>
-              <Download className="h-4 w-4" /> PDF
+            <Button variant="outline" onClick={onDownloadPdf} disabled={pdfBusy}>
+              <Download className="h-4 w-4" /> {pdfBusy ? "Generating…" : "PDF"}
             </Button>
           </div>
         </section>
 
         {/* Receipt body — printable */}
-        <section className="rounded-2xl border border-border bg-card p-6 md:p-8">
+        <section id="receipt-print-body" className="rounded-2xl border border-border bg-card p-6 md:p-8">
           <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Receipt</p>

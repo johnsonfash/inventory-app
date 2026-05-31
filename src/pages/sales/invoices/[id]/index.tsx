@@ -96,6 +96,34 @@ export default function SalesInvoiceDetail() {
   const isRefunded = invoice.status === "refunded"
   const overdueDays = invoice.status === "overdue" ? Math.round((Date.now() - new Date(invoice.dueDate).getTime()) / 86_400_000) : 0
 
+  const [pdfBusy, setPdfBusy] = React.useState(false)
+  const onDownloadPdf = async () => {
+    setPdfBusy(true)
+    try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ])
+      const el = document.getElementById("invoice-print-body") as HTMLElement | null
+      if (!el) {
+        toast.error("Couldn't find invoice body to export.")
+        return
+      }
+      const canvas = await html2canvas(el, { scale: 2, useCORS: true })
+      const imgData = canvas.toDataURL("image/png")
+      const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" })
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const ratio = pageWidth / canvas.width
+      pdf.addImage(imgData, "PNG", 0, 20, pageWidth, canvas.height * ratio)
+      pdf.save(`${invoice.number}.pdf`)
+      toast.success("Invoice PDF downloaded.")
+    } catch {
+      toast.error("Couldn't generate PDF. Try Print instead.")
+    } finally {
+      setPdfBusy(false)
+    }
+  }
+
   const recordPayment = (next: Omit<Payment, "id" | "invoiceId" | "recordedById">) => {
     const newPayment: Payment = {
       ...next,
@@ -194,8 +222,8 @@ export default function SalesInvoiceDetail() {
             <Button variant="outline" onClick={() => window.print()}>
               <Printer className="h-4 w-4" /> Print
             </Button>
-            <Button variant="outline">
-              <Download className="h-4 w-4" /> PDF
+            <Button variant="outline" onClick={onDownloadPdf} disabled={pdfBusy}>
+              <Download className="h-4 w-4" /> {pdfBusy ? "Generating…" : "PDF"}
             </Button>
           </div>
         </section>
@@ -249,7 +277,7 @@ export default function SalesInvoiceDetail() {
         {/* Lines + Side payments */}
         <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
           {/* Line items */}
-          <section className="rounded-2xl border border-border bg-card">
+          <section id="invoice-print-body" className="rounded-2xl border border-border bg-card">
             <div className="flex items-baseline gap-1.5 border-b border-border px-4 py-3">
               <h3 className="text-sm font-semibold md:text-base">Line items</h3>
               <InfoTooltip label="Line items" size="xs">

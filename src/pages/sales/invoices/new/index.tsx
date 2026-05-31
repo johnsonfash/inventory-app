@@ -1,4 +1,6 @@
 import * as React from "react"
+import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import { FileText, User, Wallet } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -14,6 +16,23 @@ import { SwitchField } from "@/components/forms/switch-field"
 
 export default function NewInvoice() {
   const [submitting, setSubmitting] = React.useState(false)
+  const [subtotal, setSubtotal] = React.useState("")
+  const [tax, setTax] = React.useState("")
+  const [total, setTotal] = React.useState("")
+  const navigate = useNavigate()
+
+  // Cheap sanity check: subtotal + tax should equal total (within
+  // a 1-cent rounding tolerance). Real backend will recompute from
+  // line items, but in the meantime this catches typos before save.
+  const totalsMismatch = React.useMemo(() => {
+    const s = Number(subtotal)
+    const t = Number(tax)
+    const g = Number(total)
+    if (!Number.isFinite(s) || !Number.isFinite(t) || !Number.isFinite(g)) return false
+    if (g === 0 && s === 0 && t === 0) return false
+    return Math.abs(s + t - g) > 0.01
+  }, [subtotal, tax, total])
+
   return (
     <FormShell
       title="New invoice"
@@ -28,7 +47,20 @@ export default function NewInvoice() {
         </>
       }
       backHref="/sales/invoices"
-      onSubmit={() => { setSubmitting(true); setTimeout(() => setSubmitting(false), 500) }}
+      onSubmit={() => {
+        if (totalsMismatch) {
+          toast.error("Subtotal + tax doesn't match total.", {
+            description: "Fix the amounts before saving — they need to add up.",
+          })
+          return
+        }
+        setSubmitting(true)
+        setTimeout(() => {
+          setSubmitting(false)
+          toast.success("Invoice created.")
+          navigate("/sales/invoices")
+        }, 500)
+      }}
       aside={
         <FormAside
           tips={[
@@ -92,17 +124,42 @@ export default function NewInvoice() {
           </FormField>
           <FormField label="Subtotal" tooltip="Sum of all line items before tax. If you're using line items, Pallio fills this automatically.">
             <InputAddon leading="$">
-              <input type="number" step="0.01" placeholder="0.00" />
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={subtotal}
+                onChange={(e) => setSubtotal(e.target.value)}
+              />
             </InputAddon>
           </FormField>
           <FormField label="Tax" tooltip="VAT or sales tax on the subtotal. Pallio applies the default rate from Settings → Taxes unless you override it.">
             <InputAddon leading="$">
-              <input type="number" step="0.01" placeholder="0.00" />
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={tax}
+                onChange={(e) => setTax(e.target.value)}
+              />
             </InputAddon>
           </FormField>
-          <FormField label="Total" required tooltip="Subtotal + Tax. This is what the customer actually pays.">
+          <FormField
+            label="Total"
+            required
+            tooltip="Subtotal + Tax. This is what the customer actually pays."
+            hint={totalsMismatch ? "Subtotal + tax doesn't equal total." : undefined}
+          >
             <InputAddon leading="$">
-              <input type="number" step="0.01" placeholder="0.00" required />
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                required
+                value={total}
+                onChange={(e) => setTotal(e.target.value)}
+                aria-invalid={totalsMismatch || undefined}
+              />
             </InputAddon>
           </FormField>
         </FormGrid>

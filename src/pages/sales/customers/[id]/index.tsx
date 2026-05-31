@@ -19,6 +19,7 @@ import {
 import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
 import { EmptyState } from "@/components/lists/empty-state"
 import { Avatar } from "@/components/avatar"
@@ -104,6 +105,7 @@ export default function CustomerDetail() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
   const { formatPrice } = useCurrency()
+  const [confirmDelete, setConfirmDelete] = React.useState(false)
 
   const customer = CUSTOMERS.find((c) => c.slug === id)
 
@@ -149,8 +151,33 @@ export default function CustomerDetail() {
     window.open(`https://wa.me/${num}`, "_blank")
   }
   const onEdit = () => navigate(`/sales/customers/${customer.slug}/edit`)
-  const onDelete = () => toast("Delete will land with the backend.")
-  const onExport = () => toast("CSV export will land with the backend.")
+  const onDelete = () => setConfirmDelete(true)
+  const confirmDeleteCustomer = () => {
+    setConfirmDelete(false)
+    toast.success(`${customer.name} marked for deletion. Order history is kept.`)
+    navigate("/sales/customers")
+  }
+  const onExport = () => {
+    // Build a CSV of this customer's recent orders client-side so the
+    // button always produces a real file (backend wiring later).
+    const rows = orders
+    const headers = ["invoice", "date", "items", "total", "channel", "status"]
+    const escape = (s: unknown) => `"${String(s ?? "").replace(/"/g, '""')}"`
+    const csv = [
+      headers.join(","),
+      ...rows.map((o) =>
+        [o.id, o.date, o.items, o.total, o.channel, o.status].map(escape).join(","),
+      ),
+    ].join("\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${customer.slug}-orders.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success(`Exported ${rows.length} order${rows.length === 1 ? "" : "s"} as CSV.`)
+  }
 
   return (
     <PageShell
@@ -335,6 +362,26 @@ export default function CustomerDetail() {
           </button>
         </div>
       </div>
+
+      <Dialog open={confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(false)}>
+        <DialogContent className="max-w-sm">
+          <div className="flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400">
+              <Trash2 className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-base font-semibold">Delete {customer.name}?</p>
+              <p className="text-[11px] text-muted-foreground">
+                Their profile is removed. Past orders + invoices stay for audit.
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+            <Button type="button" variant="destructive" onClick={confirmDeleteCustomer}>Delete customer</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   )
 }

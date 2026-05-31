@@ -1,11 +1,13 @@
 import * as React from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import {
   ArrowRight,
   Check,
   ChevronRight,
   ClipboardList,
   FileText,
+  Loader2,
   Plus,
   Search,
 } from "lucide-react"
@@ -66,9 +68,23 @@ function fmtDate(iso: string): string {
 export default function SalesOrders() {
   useRegisterPageRefresh(React.useCallback(async () => { await new Promise((r) => setTimeout(r, 400)) }, []))
   const isMobile = useIsMobile()
+  const navigate = useNavigate()
   const [query, setQuery] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState<OrderStatus | "all">("all")
+  const [invoicingId, setInvoicingId] = React.useState<string | null>(null)
   const { formatPrice: fmtMoney, formatCompact } = useCurrency()
+
+  const onInvoiceOrder = async (orderId: string) => {
+    if (invoicingId) return
+    setInvoicingId(orderId)
+    try {
+      await new Promise((r) => setTimeout(r, 350))
+      toast.success("Invoice draft ready — finish the details below.")
+      navigate("/sales/invoices/new")
+    } finally {
+      setInvoicingId(null)
+    }
+  }
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -240,9 +256,22 @@ export default function SalesOrders() {
                           Open invoice <ArrowRight className="h-3 w-3" />
                         </Link>
                       ) : o.status === "accepted" ? (
-                        <Link to="/sales/invoices/new">
-                          <Button size="sm"><Plus className="h-3.5 w-3.5" /> Invoice this order</Button>
-                        </Link>
+                        <Button
+                          size="sm"
+                          onClick={() => onInvoiceOrder(o.id)}
+                          disabled={invoicingId !== null}
+                          aria-label={`Invoice order ${o.number}`}
+                        >
+                          {invoicingId === o.id ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Invoicing…
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="h-3.5 w-3.5" /> Invoice this order
+                            </>
+                          )}
+                        </Button>
                       ) : (
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       )}

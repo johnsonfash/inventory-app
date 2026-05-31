@@ -1,9 +1,11 @@
 import * as React from "react"
+import { toast } from "sonner"
 import { ArrowUp, Hash, MessageSquare, MoreHorizontal, Trash2, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import { useChatKeyboard } from "@/hooks/use-chat-keyboard"
 import { kvJson } from "@/lib/storage/kv"
@@ -57,6 +59,7 @@ export default function TeamChatPage() {
   const [text, setText] = React.useState("")
   const [channel, setChannel] = React.useState<Channel>("general")
   const [messages, setMsgs] = React.useState<Message[]>(getMessages)
+  const [confirmClear, setConfirmClear] = React.useState(false)
   // Chat-aware keyboard handling on native. The hook owns the scroll
   // ref so the ResizeObserver auto-snap can fire on keyboard show.
   const kb = useChatKeyboard()
@@ -111,10 +114,16 @@ export default function TeamChatPage() {
   }
 
   function clearChannel() {
-    if (!confirm(`Clear all messages in #${channel}?`)) return
+    setConfirmClear(true)
+  }
+
+  function confirmClearChannel() {
+    const removed = messages.filter((m) => m.channel === channel).length
     const next = messages.filter((m) => m.channel !== channel)
     setMsgs(next)
     setMessagesStorage(next)
+    setConfirmClear(false)
+    toast.success(`Cleared ${removed} message${removed === 1 ? "" : "s"} from #${channel}.`)
   }
 
   return (
@@ -285,7 +294,14 @@ export default function TeamChatPage() {
                   placeholder={`Message #${channel}…`}
                   className="flex-1"
                 />
-                <Button type="submit" size="icon" className="h-10 w-10" disabled={!text.trim()}>
+                <Button
+                  type="submit"
+                  size="icon"
+                  className="h-10 w-10"
+                  disabled={!text.trim()}
+                  aria-label={text.trim() ? "Send message" : "Send (type a message first)"}
+                  title={text.trim() ? "Send message" : "Type a message to enable send"}
+                >
                   <ArrowUp className="h-4 w-4" />
                 </Button>
               </form>
@@ -295,6 +311,26 @@ export default function TeamChatPage() {
 
         {/* Unused refs to keep imports trim */}
         <div className="hidden"><MoreHorizontal /></div>
+
+        <Dialog open={confirmClear} onOpenChange={(o) => !o && setConfirmClear(false)}>
+          <DialogContent className="max-w-sm">
+            <div className="flex items-center gap-2">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400">
+                <Trash2 className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-base font-semibold">Clear #{channel}?</p>
+                <p className="truncate text-[11px] text-muted-foreground">
+                  This removes every message in this channel for everyone.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setConfirmClear(false)}>Cancel</Button>
+              <Button type="button" variant="destructive" onClick={confirmClearChannel}>Clear channel</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </PageShell>
     </RoleGuard>
   )

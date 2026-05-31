@@ -1,4 +1,6 @@
 import * as React from "react"
+import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import { ClipboardList, Plus, Trash2, User, Wallet } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -21,6 +23,7 @@ const newLine = (): Line => ({ id: `L-${++lineSeq}`, sku: "", qty: 1, price: 0 }
 export default function NewOrder() {
   const [lines, setLines] = React.useState<Line[]>([newLine()])
   const [submitting, setSubmitting] = React.useState(false)
+  const navigate = useNavigate()
   const { formatPrice, symbol } = useCurrency()
 
   const subtotal = lines.reduce((s, l) => s + l.qty * l.price, 0)
@@ -46,7 +49,11 @@ export default function NewOrder() {
       backHref="/sales/orders"
       onSubmit={() => {
         setSubmitting(true)
-        setTimeout(() => setSubmitting(false), 600)
+        setTimeout(() => {
+          setSubmitting(false)
+          toast.success("Order created.")
+          navigate("/sales/orders")
+        }, 600)
       }}
       aside={
         <FormAside title="Summary">

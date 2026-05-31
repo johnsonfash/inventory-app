@@ -91,7 +91,16 @@ export default function MemberDetailPage() {
           <section className="flex flex-col gap-2">
             <h3 className="text-base font-semibold tracking-tight md:text-lg">Recent invoices</h3>
             {recent.length === 0 ? (
-              <EmptyState Icon={Receipt} title="No invoices yet" description="Sales attributed to this rep will appear here." />
+              <EmptyState
+                Icon={Receipt}
+                title="No invoices yet"
+                description="Sales attributed to this rep will appear here."
+                action={
+                  <Link to="/sales/invoices/new">
+                    <Button size="sm"><Receipt className="h-3.5 w-3.5" /> Create first invoice</Button>
+                  </Link>
+                }
+              />
             ) : (
               <ul className="space-y-2">
                 {recent.map((i) => (

@@ -1,5 +1,6 @@
 import * as React from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import {
   ChevronRight,
   Clock,
@@ -53,6 +54,7 @@ const statusTone: Record<Status, StatusTone> = {
 
 export default function Invoices() {
   const isMobile = useIsMobile()
+  const navigate = useNavigate()
   const [query, setQuery] = React.useState("")
   const { formatPrice } = useCurrency()
   const [filterOpen, setFilterOpen] = React.useState(false)
@@ -145,8 +147,21 @@ export default function Invoices() {
               <li key={r.id}>
                 <SwipeableRow
                   rightActions={[
-                    { label: "Print", tone: "neutral", icon: <Printer className="h-4 w-4" />, onPress: () => {} },
-                    { label: "Pay", tone: "primary", icon: <CreditCard className="h-4 w-4" />, onPress: () => {} },
+                    {
+                      label: "Print",
+                      tone: "neutral",
+                      icon: <Printer className="h-4 w-4" />,
+                      onPress: () => {
+                        toast.success(`Printing ${r.id}…`)
+                        window.print()
+                      },
+                    },
+                    {
+                      label: "Pay",
+                      tone: "primary",
+                      icon: <CreditCard className="h-4 w-4" />,
+                      onPress: () => navigate(`/sales/invoices/${r.id}`),
+                    },
                   ]}
                 >
                   <Link to={`/sales/invoices/${r.id}`} className="flex items-center gap-3 p-3">

@@ -1,7 +1,9 @@
 import * as React from "react"
+import { Link } from "react-router-dom"
 import { Boxes, Package, PackageX, Search } from "lucide-react"
 import { PageShell } from "@/components/page-shell"
 import { ProductThumb } from "@/components/product-thumb"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
@@ -110,7 +112,12 @@ export default function SalesInventoryPage() {
           <EmptyState
             Icon={out > 0 && filter === "out" ? PackageX : Boxes}
             title="No items match"
-            description="Try adjusting the search or stock filter."
+            description="Try adjusting the search or stock filter — or head to the full inventory page to add and edit items."
+            action={
+              <Link to="/inventory">
+                <Button size="sm" variant="outline"><Boxes className="h-3.5 w-3.5" /> Open full inventory</Button>
+              </Link>
+            }
           />
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">

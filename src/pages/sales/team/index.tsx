@@ -107,13 +107,22 @@ export default function TeamPerformancePage() {
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search reps…" className="pl-9" />
             </div>
-            <div className="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-1.5 text-sm">
+            <div className="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-1.5 text-sm" title="Commission rate · 0–100%">
               <span className="text-xs text-muted-foreground">Commission</span>
               <Input
                 type="number"
                 placeholder="0"
+                min={0}
+                max={100}
+                step={0.5}
+                aria-label="Commission rate (0 to 100 percent)"
                 value={commissionRate === 0 ? "" : commissionRate}
-                onChange={(e) => setCommissionRate(e.target.value === "" ? 0 : Math.max(0, Number(e.target.value) || 0))}
+                onChange={(e) => {
+                  if (e.target.value === "") { setCommissionRate(0); return }
+                  const n = Number(e.target.value)
+                  if (Number.isNaN(n)) return
+                  setCommissionRate(Math.min(100, Math.max(0, n)))
+                }}
                 className="h-7 w-14 border-0 bg-transparent p-0 text-right text-sm focus-visible:ring-0"
               />
               <span className="text-xs text-muted-foreground">%</span>
