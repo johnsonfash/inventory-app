@@ -31,6 +31,7 @@ import { EmptyState } from "@/components/lists/empty-state"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import { getStorefrontState, TEMPLATES_BY_ID } from "@/lib/storefront/data"
+import { kvJson } from "@/lib/storage/kv"
 import { cn } from "@/lib/utils"
 
 // Storefront pages — list every page in the active template, let the
@@ -52,7 +53,10 @@ type StorefrontPage = {
   inMenu: boolean
 }
 
-const PAGES: StorefrontPage[] = [
+const PAGES_OVERRIDES_KEY = "pallio:storefront:pages-overrides"
+type PageOverrides = Record<string, { status?: PageStatus }>
+
+const SEED_PAGES: StorefrontPage[] = [
   { path: "/",          name: "Home",         kind: "essential", status: "live", description: "Hero + featured products + newsletter signup.", visits30d: 8_240, lastEdited: "2d ago",  inMenu: false },
   { path: "/shop",      name: "Shop",         kind: "essential", status: "live", description: "Filterable catalog with category drilldown.",      visits30d: 5_120, lastEdited: "1w ago",  inMenu: true },
   { path: "/lookbook",  name: "Lookbook",     kind: "custom",    status: "live", description: "Editorial photoshoot with shoppable hotspots.",     visits30d: 1_840, lastEdited: "3d ago",  inMenu: true },
@@ -90,27 +94,53 @@ export default function StorefrontPages() {
   const [query, setQuery] = React.useState("")
   const [filter, setFilter] = React.useState<Filter>("all")
 
+  // Apply persisted overrides on top of the seed list so visibility
+  // toggles survive reload. Backend will replace the seed with real
+  // template pages — overrides shape (path → status) won't change.
+  const [pages, setPages] = React.useState<StorefrontPage[]>(() => {
+    const overrides = kvJson.get<PageOverrides>(PAGES_OVERRIDES_KEY) ?? {}
+    return SEED_PAGES.map((p) => overrides[p.path] ? { ...p, ...overrides[p.path] } : p)
+  })
+
+  const togglePageStatus = React.useCallback(async (path: string) => {
+    let nextStatus: PageStatus = "live"
+    setPages((prev) => prev.map((p) => {
+      if (p.path !== path) return p
+      nextStatus = p.status === "live" ? "hidden" : "live"
+      return { ...p, status: nextStatus, lastEdited: "just now" }
+    }))
+    try {
+      const overrides = kvJson.get<PageOverrides>(PAGES_OVERRIDES_KEY) ?? {}
+      overrides[path] = { status: nextStatus }
+      await kvJson.set(PAGES_OVERRIDES_KEY, overrides)
+      const page = pages.find((p) => p.path === path)
+      toast.success(nextStatus === "live" ? `${page?.name ?? "Page"} published.` : `${page?.name ?? "Page"} hidden.`)
+    } catch {
+      toast.error("Couldn't save change.")
+    }
+  }, [pages])
+
   const state = React.useMemo(() => getStorefrontState(), [])
   const template = state.templateId ? TEMPLATES_BY_ID[state.templateId] : null
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase()
-    return PAGES.filter((p) => {
+    return pages.filter((p) => {
       if (filter === "in-menu" && !p.inMenu) return false
       if (filter === "custom" && p.kind !== "custom") return false
       if (filter !== "all" && filter !== "in-menu" && filter !== "custom" && p.status !== filter) return false
       if (!q) return true
       return p.name.toLowerCase().includes(q) || p.path.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)
     })
-  }, [query, filter])
+  }, [query, filter, pages])
 
   const counts: Record<Filter, number> = {
-    all:      PAGES.length,
-    live:     PAGES.filter((p) => p.status === "live").length,
-    draft:    PAGES.filter((p) => p.status === "draft").length,
-    hidden:   PAGES.filter((p) => p.status === "hidden").length,
-    "in-menu":PAGES.filter((p) => p.inMenu).length,
-    custom:   PAGES.filter((p) => p.kind === "custom").length,
+    all:      pages.length,
+    live:     pages.filter((p) => p.status === "live").length,
+    draft:    pages.filter((p) => p.status === "draft").length,
+    hidden:   pages.filter((p) => p.status === "hidden").length,
+    "in-menu":pages.filter((p) => p.inMenu).length,
+    custom:   pages.filter((p) => p.kind === "custom").length,
   }
 
   if (!template) {
@@ -154,7 +184,7 @@ export default function StorefrontPages() {
       <div className="flex flex-col gap-4">
         <SummaryStrip
           tiles={[
-            { label: "Pages",       value: String(PAGES.length),         tone: "brand",   hint: `${counts.custom} custom` },
+            { label: "Pages",       value: String(pages.length),         tone: "brand",   hint: `${counts.custom} custom` },
             { label: "Live",        value: String(counts.live),          tone: "success", hint: "visible to shoppers" },
             { label: "In menu",     value: String(counts["in-menu"]),     tone: "info",    hint: "top navigation" },
             { label: "Drafts",      value: String(counts.draft),         tone: "neutral", hint: "not yet visible" },
@@ -212,7 +242,7 @@ export default function StorefrontPages() {
               </Button>
             </div>
             <ul className="-mx-1 mt-3 flex gap-1.5 overflow-x-auto px-1 scrollbar-hide">
-              {PAGES.filter((p) => p.inMenu).map((p) => (
+              {pages.filter((p) => p.inMenu).map((p) => (
                 <li
                   key={p.path}
                   className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold"
@@ -296,7 +326,7 @@ export default function StorefrontPages() {
                               size="sm"
                               variant="ghost"
                               aria-label={p.status === "live" ? "Hide page" : "Publish page"}
-                              onClick={() => toast.success(p.status === "live" ? `${p.name} hidden.` : `${p.name} published.`)}
+                              onClick={() => togglePageStatus(p.path)}
                             >
                               {p.status === "live" ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
                             </Button>
@@ -342,7 +372,11 @@ export default function StorefrontPages() {
                   ))}
                 </ul>
               </div>
-              <Button size="sm" onClick={() => toast("Block editor arrives with the backend.")}>
+              <Button
+                size="sm"
+                disabled
+                title="Block editor is part of the upcoming Storefront backend."
+              >
                 Open editor <ArrowRight className="h-3 w-3" />
               </Button>
             </div>
@@ -383,7 +417,12 @@ function PageCard({ page: p, liveUrl }: { page: StorefrontPage; liveUrl: string 
                   <ExternalLink className="h-3 w-3" /> View
                 </Button>
               </a>
-              <Button size="sm" className="flex-1" onClick={() => toast("Block editor arrives with the backend.")}>
+              <Button
+                size="sm"
+                className="flex-1"
+                disabled
+                title="Block editor is part of the upcoming Storefront backend."
+              >
                 <PencilLine className="h-3 w-3" /> Edit
               </Button>
             </div>

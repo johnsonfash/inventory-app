@@ -28,6 +28,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import { useCurrency } from "@/contexts/currency"
 import { getStorefrontState, TEMPLATES_BY_ID } from "@/lib/storefront/data"
+import { kvJson } from "@/lib/storage/kv"
 import { cn } from "@/lib/utils"
 
 // Storefront catalog — which items from your master Inventory are
@@ -51,7 +52,10 @@ type StorefrontProduct = {
   sold30d: number
 }
 
-const PRODUCTS: StorefrontProduct[] = [
+const PRODUCT_OVERRIDES_KEY = "pallio:storefront:product-overrides"
+type ProductOverrides = Record<string, { status?: ProductStatus }>
+
+const SEED_PRODUCTS: StorefrontProduct[] = [
   { sku: "AP-4012", name: "Cotton Tee — Black",         price: 12_500, compareAt: 16_000, image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=320&h=320&fit=crop&auto=format&q=80", category: "Apparel",      brand: "BasicCo", stock: 120, status: "live",         featured: true,  views30d: 2_410, sold30d: 142 },
   { sku: "BT-9091", name: "Hydrating Serum",            price: 18_000,                     image: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=320&h=320&fit=crop&auto=format&q=80", category: "Beauty",       brand: "Glow",    stock:  34, status: "live",         featured: true,  views30d: 1_840, sold30d:  98 },
   { sku: "EL-2109", name: "USB-C Hub 6-in-1",           price: 25_000,                     image: "https://images.unsplash.com/photo-1625948515291-69613efd103f?w=320&h=320&fit=crop&auto=format&q=80", category: "Electronics",  brand: "Gizmo",   stock:  48, status: "live",         featured: true,  views30d: 1_620, sold30d:  74 },
@@ -80,12 +84,40 @@ export default function StorefrontProducts() {
   const [query, setQuery] = React.useState("")
   const [filter, setFilter] = React.useState<Filter>("all")
 
+  // Apply persisted overrides on top of the seed list so visibility
+  // toggles survive reload. Backend will replace the seed with real
+  // catalog data — overrides shape (sku → status) won't change.
+  const [products, setProducts] = React.useState<StorefrontProduct[]>(() => {
+    const overrides = kvJson.get<ProductOverrides>(PRODUCT_OVERRIDES_KEY) ?? {}
+    return SEED_PRODUCTS.map((p) => overrides[p.sku] ? { ...p, ...overrides[p.sku] } : p)
+  })
+
+  const toggleProductVisibility = React.useCallback(async (sku: string) => {
+    let nextStatus: ProductStatus = "live"
+    let productName = "Product"
+    setProducts((prev) => prev.map((p) => {
+      if (p.sku !== sku) return p
+      productName = p.name
+      // Out-of-stock items always go hidden; everything else flips live ↔ hidden.
+      nextStatus = p.status === "live" ? "hidden" : "live"
+      return { ...p, status: nextStatus }
+    }))
+    try {
+      const overrides = kvJson.get<ProductOverrides>(PRODUCT_OVERRIDES_KEY) ?? {}
+      overrides[sku] = { status: nextStatus }
+      await kvJson.set(PRODUCT_OVERRIDES_KEY, overrides)
+      toast.success(nextStatus === "live" ? `${productName} published.` : `${productName} hidden from storefront.`)
+    } catch {
+      toast.error("Couldn't save change.")
+    }
+  }, [])
+
   const state = React.useMemo(() => getStorefrontState(), [])
   const template = state.templateId ? TEMPLATES_BY_ID[state.templateId] : null
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase()
-    return PRODUCTS.filter((p) => {
+    return products.filter((p) => {
       if (filter === "featured" && !p.featured) return false
       if (filter !== "all" && filter !== "featured" && p.status !== filter) return false
       if (!q) return true
@@ -96,15 +128,15 @@ export default function StorefrontProducts() {
         (p.brand?.toLowerCase().includes(q) ?? false)
       )
     })
-  }, [query, filter])
+  }, [query, filter, products])
 
   const counts: Record<Filter, number> = {
-    all:           PRODUCTS.length,
-    live:          PRODUCTS.filter((p) => p.status === "live").length,
-    draft:         PRODUCTS.filter((p) => p.status === "draft").length,
-    "out-of-stock":PRODUCTS.filter((p) => p.status === "out-of-stock").length,
-    hidden:        PRODUCTS.filter((p) => p.status === "hidden").length,
-    featured:      PRODUCTS.filter((p) => p.featured).length,
+    all:           products.length,
+    live:          products.filter((p) => p.status === "live").length,
+    draft:         products.filter((p) => p.status === "draft").length,
+    "out-of-stock":products.filter((p) => p.status === "out-of-stock").length,
+    hidden:        products.filter((p) => p.status === "hidden").length,
+    featured:      products.filter((p) => p.featured).length,
   }
 
   if (!template) {
@@ -254,7 +286,7 @@ export default function StorefrontProducts() {
                             size="sm"
                             variant="ghost"
                             aria-label={p.status === "live" ? "Hide from storefront" : "Show on storefront"}
-                            onClick={() => toast.success(p.status === "live" ? `${p.name} hidden from storefront.` : `${p.name} published.`)}
+                            onClick={() => toggleProductVisibility(p.sku)}
                           >
                             {p.status === "live" ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
                           </Button>

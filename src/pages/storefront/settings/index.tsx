@@ -278,7 +278,14 @@ export default function StorefrontSettings() {
                     <td className="px-3 py-2 text-right tabular-nums">₦{z.free.toLocaleString()}</td>
                     <td className="px-3 py-2 tabular-nums">{z.days}</td>
                     <td className="px-3 py-2 text-right">
-                      <Button size="sm" variant="ghost" onClick={() => toast(`Edit ${z.name} arrives with the backend.`)}>Edit</Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled
+                        title="Zone editor is part of the upcoming Storefront backend."
+                      >
+                        Edit
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -291,7 +298,12 @@ export default function StorefrontSettings() {
               description="Calls GIG / Sendbox / Kwik APIs to fetch live rates. Slightly slower but more accurate than flat rates."
               defaultChecked
             />
-            <Button size="sm" variant="outline" onClick={() => toast("Zone editor arrives with the backend.")}>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled
+              title="Zone editor is part of the upcoming Storefront backend."
+            >
               <MapPin className="h-3.5 w-3.5" /> Add zone
             </Button>
           </div>

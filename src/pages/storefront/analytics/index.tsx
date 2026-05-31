@@ -32,6 +32,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
 import { SummaryStrip } from "@/components/lists/summary-strip"
 import { EmptyState } from "@/components/lists/empty-state"
+import { toast } from "sonner"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import { useCurrency } from "@/contexts/currency"
 import { getStorefrontState, TEMPLATES_BY_ID } from "@/lib/storefront/data"
@@ -110,6 +111,41 @@ export default function StorefrontAnalytics() {
   const conversion = totalVisitors > 0 ? (totalOrders / totalVisitors) * 100 : 0
   const aov = totalOrders > 0 ? totalRevenue / totalOrders : 0
 
+  // Build CSV from the live series + aggregates. Browser-only download
+  // via a Blob + anchor click — no backend round-trip needed.
+  const exportCsv = React.useCallback(() => {
+    try {
+      const escape = (v: string | number) => {
+        const s = String(v)
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+      }
+      const rows: string[] = []
+      rows.push(["day", "visitors", "orders", "revenue"].join(","))
+      for (const d of revenueSeries) {
+        rows.push([escape(d.day), d.visitors, d.orders, d.revenue].join(","))
+      }
+      rows.push("")
+      rows.push(["metric", "value"].join(","))
+      rows.push(["total_visitors", totalVisitors].join(","))
+      rows.push(["total_orders", totalOrders].join(","))
+      rows.push(["total_revenue", totalRevenue].join(","))
+      rows.push(["conversion_pct", conversion.toFixed(2)].join(","))
+      rows.push(["avg_order_value", Math.round(aov)].join(","))
+      const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `storefront-analytics-${period}.csv`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      toast.success("Analytics CSV downloaded.")
+    } catch {
+      toast.error("Couldn't export CSV.")
+    }
+  }, [revenueSeries, totalVisitors, totalOrders, totalRevenue, conversion, aov, period])
+
   // No-template short-circuit so the page degrades gracefully.
   if (!template) {
     return (
@@ -153,7 +189,7 @@ export default function StorefrontAnalytics() {
         </>
       }
       mobileTrailing={
-        <Button size="sm" variant="ghost" onClick={() => {/* export */}}>
+        <Button size="sm" variant="ghost" onClick={exportCsv} aria-label="Export CSV">
           <Download className="h-3.5 w-3.5" />
         </Button>
       }

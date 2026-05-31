@@ -1,6 +1,7 @@
 import * as React from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { toast } from "sonner"
+import { kvJson } from "@/lib/storage/kv"
 import {
   ArrowRight,
   Calendar,
@@ -81,12 +82,35 @@ const AUDIENCE_LABEL: Record<Discount["audience"], string> = {
 
 type Filter = "all" | Status
 
+// AI suggestion → seed payload picked up by /sales/discounts/new.
+type DiscountDraftSeed = {
+  code: string
+  kind: DiscountKind
+  value: number
+  description: string
+  audience: Discount["audience"]
+  minOrder?: number
+  source: "ai-suggestion"
+}
+const DRAFT_SEED_KEY = "pallio:storefront:discount-draft-seed"
+
 export default function StorefrontDiscounts() {
   useRegisterPageRefresh(React.useCallback(async () => { await new Promise((r) => setTimeout(r, 250)) }, []))
   const isMobile = useIsMobile()
   const { formatPrice } = useCurrency()
+  const navigate = useNavigate()
   const [query, setQuery] = React.useState("")
   const [filter, setFilter] = React.useState<Filter>("all")
+
+  const startDraftFromSuggestion = React.useCallback(async (seed: DiscountDraftSeed) => {
+    try {
+      await kvJson.set(DRAFT_SEED_KEY, seed)
+      toast.success(`Draft "${seed.code}" ready — finish in the editor.`)
+      navigate("/sales/discounts/new")
+    } catch {
+      toast.error("Couldn't start draft.")
+    }
+  }, [navigate])
 
   const state = React.useMemo(() => getStorefrontState(), [])
   const template = state.templateId ? TEMPLATES_BY_ID[state.templateId] : null
@@ -180,15 +204,15 @@ export default function StorefrontDiscounts() {
             </div>
             <p className="text-[11px] text-muted-foreground">Pre-built campaigns based on what's working for similar shops in your sector.</p>
             <div className="mt-3 grid gap-2 md:grid-cols-3">
-              {[
-                { Icon: Gift,      title: "Welcome new customers",  body: "10% off first order — converts ~22% better than no code", tone: "brand"   as const },
-                { Icon: Calendar,  title: "Weekend flash",          body: "20% off for 48h — drives 3× normal sales volume",          tone: "warning" as const },
-                { Icon: Users,     title: "Win back lapsed",        body: "₦5k off for customers inactive > 60d — recovers 18%",      tone: "info"    as const },
-              ].map((s) => (
+              {([
+                { Icon: Gift,      title: "Welcome new customers",  body: "10% off first order — converts ~22% better than no code", tone: "brand"   as const, seed: { code: "WELCOME10", kind: "percent",  value: 10,     description: "10% off first order for new customers.", audience: "new", minOrder: 10_000, source: "ai-suggestion" } as DiscountDraftSeed },
+                { Icon: Calendar,  title: "Weekend flash",          body: "20% off for 48h — drives 3× normal sales volume",          tone: "warning" as const, seed: { code: "FLASH48",   kind: "percent",  value: 20,     description: "Weekend flash — 48h sitewide.",            audience: "all",                  source: "ai-suggestion" } as DiscountDraftSeed },
+                { Icon: Users,     title: "Win back lapsed",        body: "₦5k off for customers inactive > 60d — recovers 18%",      tone: "info"    as const, seed: { code: "WINBACK5K", kind: "flat",     value: 5_000,  description: "Win back — ₦5,000 off for inactive customers.", audience: "all",                source: "ai-suggestion" } as DiscountDraftSeed },
+              ]).map((s) => (
                 <button
                   key={s.title}
                   type="button"
-                  onClick={() => toast.success(`Draft ${s.title.toLowerCase()} created.`)}
+                  onClick={() => startDraftFromSuggestion(s.seed)}
                   className="flex items-start gap-3 rounded-xl border border-border bg-background p-3 text-left transition-colors hover:border-brand/40 hover:bg-accent/40"
                 >
                   <span className={cn(
@@ -390,9 +414,6 @@ function DiscountCard({
             <div className="mt-2 flex gap-1.5">
               <Button size="sm" variant="outline" className="flex-1" onClick={() => onCopy(`https://${liveUrl}?promo=${d.code}`, "Share link")}>
                 <Share2 className="h-3 w-3" /> Share
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => toast(`Edit ${d.code} arrives with the backend.`)}>
-                Edit
               </Button>
             </div>
           </div>
