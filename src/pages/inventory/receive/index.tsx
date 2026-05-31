@@ -1,4 +1,5 @@
 import * as React from "react"
+import { toast } from "sonner"
 import { ChevronRight, Package, PackageCheck, Truck } from "lucide-react"
 import { PageShell } from "@/components/page-shell"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
@@ -143,18 +144,28 @@ function ReceiveForm({ initialRef = "", onDone, onCancel }: { initialRef?: strin
   const match = catalog.find((c) => c.sku.toLowerCase() === sku.trim().toLowerCase())
   const qtyNum = Number(qty) || 0
   const valid = !!match && qtyNum > 0
+  const [submitting, setSubmitting] = React.useState(false)
 
   const submit = () => {
-    if (!valid || !match) return
-    recordStockMovement({
-      sku: match.sku,
-      name: match.name,
-      delta: qtyNum,
-      kind: "receive",
-      ref: ref.trim() || undefined,
-      location: location.trim() || undefined,
-    })
-    onDone()
+    if (!match) { toast.error("Pick a valid SKU from the catalog"); return }
+    if (qtyNum <= 0) { toast.error("Quantity must be greater than zero"); return }
+    setSubmitting(true)
+    try {
+      recordStockMovement({
+        sku: match.sku,
+        name: match.name,
+        delta: qtyNum,
+        kind: "receive",
+        ref: ref.trim() || undefined,
+        location: location.trim() || undefined,
+      })
+      toast.success(`Received ${qtyNum} ${match.sku}${ref.trim() ? ` (${ref.trim()})` : ""}`)
+      onDone()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to receive stock")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -184,8 +195,8 @@ function ReceiveForm({ initialRef = "", onDone, onCancel }: { initialRef?: strin
         </label>
       </div>
       <div className="mt-4 flex justify-end gap-2">
-        <Button variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button onClick={submit} disabled={!valid}>Receive</Button>
+        <Button variant="outline" onClick={onCancel} disabled={submitting}>Cancel</Button>
+        <Button onClick={submit} disabled={!valid || submitting}>{submitting ? "Saving…" : "Receive"}</Button>
       </div>
     </div>
   )

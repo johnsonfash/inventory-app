@@ -61,9 +61,11 @@ export default function CompositeItems() {
 
   const active = rows.filter((r) => r.status === "active").length
   const totalRevenue = rows.reduce((s, r) => s + r.sellPrice, 0)
-  const avgMargin = Math.round(
-    (rows.reduce((s, r) => s + (r.sellPrice - r.cost) / r.sellPrice, 0) / rows.length) * 100,
-  )
+  const marginRows = rows.filter((r) => r.sellPrice > 0)
+  const avgMargin = marginRows.length > 0
+    ? Math.round((marginRows.reduce((s, r) => s + (r.sellPrice - r.cost) / r.sellPrice, 0) / marginRows.length) * 100)
+    : 0
+  const avgMarginDisplay = marginRows.length > 0 ? `${avgMargin}%` : "—"
 
   return (
     <PageShell
@@ -90,7 +92,7 @@ export default function CompositeItems() {
           tiles={[
             { label: "Composites", value: String(rows.length), tone: "brand", hint: "kits / bundles" },
             { label: "Active", value: String(active), tone: "success", hint: "sellable" },
-            { label: "Avg margin", value: `${avgMargin}%`, tone: avgMargin >= 50 ? "success" : "warning", hint: "across kits" },
+            { label: "Avg margin", value: avgMarginDisplay, tone: marginRows.length > 0 && avgMargin >= 50 ? "success" : "warning", hint: "across kits" },
             { label: "Catalog price", value: formatPrice(totalRevenue), tone: "info", hint: "combined" },
           ]}
         />

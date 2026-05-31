@@ -1,5 +1,6 @@
 import * as React from "react"
 import { Link } from "react-router-dom"
+import { toast } from "sonner"
 import { Workflow, Layers, Plus, Search, Sparkles } from "lucide-react"
 import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
@@ -80,6 +81,23 @@ export default function RecipesIndex() {
     enriched.length > 0
       ? enriched.reduce((s, e) => s + e.cost, 0) / enriched.length
       : 0
+
+  // One-shot warning toast on mount if any recipe has unmatched
+  // components — operators otherwise miss the "—" cost cells.
+  const warnedRef = React.useRef(false)
+  React.useEffect(() => {
+    if (warnedRef.current) return
+    const recipesWithMissing = enriched.filter((e) => e.missing.length > 0)
+    if (recipesWithMissing.length === 0) return
+    warnedRef.current = true
+    toast.warning(
+      `${recipesWithMissing.length} recipe${recipesWithMissing.length === 1 ? "" : "s"} reference SKUs not in the catalog`,
+      {
+        description: "Cost / unit shows “—” until the missing components are added.",
+        action: { label: "Add item", onClick: () => { window.location.href = "/inventory/new" } },
+      },
+    )
+  }, [enriched])
 
   const chips: FilterChip[] = tagFilter.map((t) => ({
     key: `tag:${t}`,

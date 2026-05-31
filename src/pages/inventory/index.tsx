@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import {
   Edit3,
   Filter,
@@ -32,7 +32,7 @@ import { MobileFab } from "@/components/mobile/mobile-fab"
 import { cn } from "@/lib/utils"
 import { useCurrency } from "@/contexts/currency"
 import { loadCatalog, type CatalogItem } from "@/lib/pos/storage"
-import { deriveUnit, deriveWarranty } from "@/lib/inventory/derive"
+import { deriveUnit, deriveWarranty, UNLIMITED_STOCK } from "@/lib/inventory/derive"
 
 type Item = {
   sku: string
@@ -60,8 +60,6 @@ type Item = {
 // is deliberately broad — when in doubt, default to neutral values
 // ("pcs", "—") rather than guess.
 const LOCATIONS = ["WH-A", "WH-B", "WH-C"]
-const UNLIMITED_STOCK = 9999  // catalog sentinel for non-tracked items
-                              // (e.g. menu dishes that don't pull from a SKU)
 
 function deriveLocation(sku: string): string {
   // Deterministic hash so the same SKU always lives at the same warehouse.
@@ -157,6 +155,7 @@ function formatStock(stock: number): string {
 
 export default function InventoryItems() {
   const isMobile = useIsMobile()
+  const navigate = useNavigate()
   const { formatPrice } = useCurrency()
   const [query, setQuery] = React.useState("")
   const [filterOpen, setFilterOpen] = React.useState(false)
@@ -320,7 +319,12 @@ export default function InventoryItems() {
             </CardContent>
           </Card>
         ) : isMobile ? (
-          <MobileItemList items={filtered} formatPrice={formatPrice} onView={setViewItem} />
+          <MobileItemList
+            items={filtered}
+            formatPrice={formatPrice}
+            onView={setViewItem}
+            onReceive={() => navigate("/inventory/receive")}
+          />
         ) : (
           <DesktopItemTable items={filtered} formatPrice={formatPrice} onView={setViewItem} />
         )}
@@ -438,7 +442,7 @@ function SummaryStrip({
   )
 }
 
-function MobileItemList({ items, formatPrice, onView }: { items: Item[]; formatPrice: (n: number | null | undefined) => string; onView: (it: Item) => void }) {
+function MobileItemList({ items, formatPrice, onView, onReceive }: { items: Item[]; formatPrice: (n: number | null | undefined) => string; onView: (it: Item) => void; onReceive: (it: Item) => void }) {
   return (
     <ul className="space-y-2">
       {items.map((it) => {
@@ -452,13 +456,13 @@ function MobileItemList({ items, formatPrice, onView }: { items: Item[]; formatP
                   label: "Receive",
                   tone: "primary",
                   icon: <Truck className="h-4 w-4" />,
-                  onPress: () => {},
+                  onPress: () => onReceive(it),
                 },
                 {
                   label: "Edit",
                   tone: "neutral",
                   icon: <Edit3 className="h-4 w-4" />,
-                  onPress: () => {},
+                  onPress: () => onView(it),
                 },
               ]}
             >

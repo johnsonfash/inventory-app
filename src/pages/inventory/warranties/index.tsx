@@ -59,10 +59,11 @@ export default function Warranties() {
 
   const totalSkus = rows.reduce((s, r) => s + r.skus, 0)
   const active = rows.filter((r) => r.status === "active").length
-  const avgLength = Math.round(
-    rows.filter((r) => r.durationMonths < 1000).reduce((s, r) => s + r.durationMonths, 0) /
-      rows.filter((r) => r.durationMonths < 1000).length,
-  )
+  const finiteRows = rows.filter((r) => r.durationMonths < 1000)
+  const avgLength = finiteRows.length > 0
+    ? Math.round(finiteRows.reduce((s, r) => s + r.durationMonths, 0) / finiteRows.length)
+    : 0
+  const avgLengthDisplay = finiteRows.length > 0 ? `${avgLength}mo` : "—"
 
   return (
     <PageShell
@@ -83,7 +84,7 @@ export default function Warranties() {
             { label: "Plans", value: String(rows.length), tone: "brand", hint: "defined" },
             { label: "Active", value: String(active), tone: "success", hint: "live" },
             { label: "Items covered", value: totalSkus.toLocaleString(), tone: "info", hint: "all plans" },
-            { label: "Avg length", value: `${avgLength}mo`, tone: "warning", hint: "excl. lifetime" },
+            { label: "Avg length", value: avgLengthDisplay, tone: "warning", hint: "excl. lifetime" },
           ]}
         />
 

@@ -1,4 +1,6 @@
 import * as React from "react"
+import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import {
   Boxes,
   ImageIcon,
@@ -24,6 +26,7 @@ import { useAutoMarkStep } from "@/hooks/use-auto-mark-step"
 
 export default function NewItemPage() {
   useAutoMarkStep("first-item")
+  const navigate = useNavigate()
   // App Wave 5: first-visit hint pointing at the SKU field.
   const skuRef = React.useRef<HTMLInputElement>(null)
   const [suppliers, setSuppliers] = React.useState(["Cobalt Distributors", "Delta Apparel", "Glow Co"])
@@ -32,10 +35,52 @@ export default function NewItemPage() {
   const [taxable, setTaxable] = React.useState(true)
   const [submitting, setSubmitting] = React.useState(false)
 
-  const handleSubmit = () => {
+  // Controlled state for required fields so we can validate.
+  const [itemName, setItemName] = React.useState("")
+  const [skuValue, setSkuValue] = React.useState("")
+  const [cost, setCost] = React.useState("")
+  const [retail, setRetail] = React.useState("")
+  const [errors, setErrors] = React.useState<{ name?: string; sku?: string; cost?: string; retail?: string }>({})
+
+  const validate = (): boolean => {
+    const next: typeof errors = {}
+    if (!itemName.trim()) next.name = "Item name is required"
+    if (!skuValue.trim()) next.sku = "SKU is required"
+    const costNum = Number(cost)
+    const retailNum = Number(retail)
+    if (!cost.trim() || isNaN(costNum) || costNum < 0) next.cost = "Enter a valid unit cost"
+    if (!retail.trim() || isNaN(retailNum) || retailNum < 0) next.retail = "Enter a valid retail price"
+    setErrors(next)
+    return Object.keys(next).length === 0
+  }
+
+  // Industry-agnostic pricing warning — flagged but non-blocking. Some
+  // operators legitimately run promo loss-leaders, services priced
+  // below sourcing cost, etc.
+  const marginWarning = React.useMemo(() => {
+    const c = Number(cost)
+    const r = Number(retail)
+    if (!cost.trim() || !retail.trim() || isNaN(c) || isNaN(r)) return null
+    if (c > 0 && r <= c) return "Retail price is at or below unit cost — margin will be zero or negative."
+    return null
+  }, [cost, retail])
+
+  const handleSubmit = (e?: React.FormEvent<HTMLFormElement>) => {
+    e?.preventDefault?.()
+    if (!validate()) {
+      toast.error("Fix the highlighted fields and try again.")
+      return
+    }
+    if (marginWarning) {
+      toast.warning(marginWarning)
+    }
     setSubmitting(true)
     // Mock save — replace with real mutation when backend lands.
-    setTimeout(() => setSubmitting(false), 600)
+    setTimeout(() => {
+      setSubmitting(false)
+      toast.success(`Saved “${itemName.trim()}” (${skuValue.trim()})`)
+      navigate("/inventory")
+    }, 600)
   }
 
   return (
@@ -66,14 +111,23 @@ export default function NewItemPage() {
     >
       <FormSection title="Basics" description="Identity and classification" Icon={Package2}>
         <FormGrid cols={2}>
-          <FormField label="Item name" required htmlFor="item-name" hint="Shown in catalog, POS, and invoices.">
-            <Input id="item-name" placeholder="USB‑C Hub 6‑in‑1" required />
+          <FormField label="Item name" required htmlFor="item-name" hint="Shown in catalog, POS, and invoices." error={errors.name}>
+            <Input
+              id="item-name"
+              placeholder="USB‑C Hub 6‑in‑1"
+              required
+              value={itemName}
+              onChange={(e) => setItemName(e.target.value)}
+              onBlur={() => setErrors((prev) => ({ ...prev, name: itemName.trim() ? undefined : "Item name is required" }))}
+              aria-invalid={!!errors.name}
+            />
           </FormField>
           <FormField
             label="SKU"
             required
             htmlFor="sku"
             hint="Unique product code. Letters, numbers, dashes."
+            error={errors.sku}
             tooltip={
               <>
                 <strong>Stock Keeping Unit.</strong> A short code only you use — it's how
@@ -84,7 +138,16 @@ export default function NewItemPage() {
               </>
             }
           >
-            <Input id="sku" ref={skuRef} placeholder="EL-2109" required />
+            <Input
+              id="sku"
+              ref={skuRef}
+              placeholder="EL-2109"
+              required
+              value={skuValue}
+              onChange={(e) => setSkuValue(e.target.value)}
+              onBlur={() => setErrors((prev) => ({ ...prev, sku: skuValue.trim() ? undefined : "SKU is required" }))}
+              aria-invalid={!!errors.sku}
+            />
           </FormField>
           <FormField label="Category" required tooltip="Groups items together in reports and on the storefront — e.g. Electronics, Apparel, Beauty.">
             <Select defaultValue="electronics">
@@ -148,19 +211,46 @@ export default function NewItemPage() {
             label="Unit cost"
             required
             hint="What you pay your supplier."
+            error={errors.cost}
             tooltip="The amount per piece that the supplier charges you (excluding tax). Pallio uses this to work out your profit and to value your stock on reports."
           >
             <InputAddon leading="$">
-              <input type="number" step="0.01" placeholder="0.00" required />
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                required
+                value={cost}
+                onChange={(e) => setCost(e.target.value)}
+                onBlur={() => {
+                  const n = Number(cost)
+                  setErrors((prev) => ({ ...prev, cost: cost.trim() && !isNaN(n) && n >= 0 ? undefined : "Enter a valid unit cost" }))
+                }}
+                aria-invalid={!!errors.cost}
+              />
             </InputAddon>
           </FormField>
           <FormField
             label="Retail price"
             required
+            error={errors.retail ?? (marginWarning && !errors.retail ? marginWarning : undefined)}
+            hint={!marginWarning && !errors.retail ? "What a walk-in customer pays." : undefined}
             tooltip="What a walk-in customer pays. This is the price the POS uses by default."
           >
             <InputAddon leading="$">
-              <input type="number" step="0.01" placeholder="0.00" required />
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                required
+                value={retail}
+                onChange={(e) => setRetail(e.target.value)}
+                onBlur={() => {
+                  const n = Number(retail)
+                  setErrors((prev) => ({ ...prev, retail: retail.trim() && !isNaN(n) && n >= 0 ? undefined : "Enter a valid retail price" }))
+                }}
+                aria-invalid={!!errors.retail}
+              />
             </InputAddon>
           </FormField>
           <FormField

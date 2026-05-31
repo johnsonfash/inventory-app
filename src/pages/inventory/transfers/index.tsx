@@ -1,4 +1,5 @@
 import * as React from "react"
+import { toast } from "sonner"
 import { ArrowLeftRight, MoveRight, Plus, Search } from "lucide-react"
 import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
@@ -138,13 +139,25 @@ function TransferForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
   const match = catalog.find((c) => c.sku.toLowerCase() === sku.trim().toLowerCase())
   const qtyNum = Number(qty) || 0
   const valid = !!match && qtyNum > 0 && from.trim() && to.trim() && from.trim() !== to.trim()
+  const [submitting, setSubmitting] = React.useState(false)
 
   const submit = () => {
-    if (!valid || !match) return
+    if (!match) { toast.error("Pick a valid SKU from the catalog"); return }
+    if (qtyNum <= 0) { toast.error("Quantity must be greater than zero"); return }
+    if (!from.trim() || !to.trim()) { toast.error("Pick both From and To locations"); return }
+    if (from.trim() === to.trim()) { toast.error("From and To must be different locations"); return }
+    setSubmitting(true)
     const ref = `TR-${genId("t").slice(-5).toUpperCase()}`
-    recordStockMovement({ sku: match.sku, name: match.name, delta: -qtyNum, kind: "transfer-out", location: from.trim(), toLocation: to.trim(), ref })
-    recordStockMovement({ sku: match.sku, name: match.name, delta: qtyNum, kind: "transfer-in", location: to.trim(), ref })
-    onDone()
+    try {
+      recordStockMovement({ sku: match.sku, name: match.name, delta: -qtyNum, kind: "transfer-out", location: from.trim(), toLocation: to.trim(), ref })
+      recordStockMovement({ sku: match.sku, name: match.name, delta: qtyNum, kind: "transfer-in", location: to.trim(), ref })
+      toast.success(`Transferred ${qtyNum} ${match.sku} from ${from.trim()} to ${to.trim()}`)
+      onDone()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to record transfer")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -174,8 +187,8 @@ function TransferForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
         </label>
       </div>
       <div className="mt-4 flex justify-end gap-2">
-        <Button variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button onClick={submit} disabled={!valid}>Transfer</Button>
+        <Button variant="outline" onClick={onCancel} disabled={submitting}>Cancel</Button>
+        <Button onClick={submit} disabled={!valid || submitting}>{submitting ? "Saving…" : "Transfer"}</Button>
       </div>
     </div>
   )

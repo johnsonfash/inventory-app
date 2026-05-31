@@ -53,10 +53,25 @@ function derivePriceLists(): Row[] {
   }))
 }
 
+function safeDerivePriceLists(): { rows: Row[]; error: string | null } {
+  try {
+    return { rows: derivePriceLists(), error: null }
+  } catch (err) {
+    return { rows: [], error: err instanceof Error ? err.message : "Could not load price tiers" }
+  }
+}
+
 export default function PriceLists() {
   const [query, setQuery] = React.useState("")
-  const [rows, setRows] = React.useState<Row[]>(() => derivePriceLists())
-  useRegisterPageRefresh(React.useCallback(async () => { setRows(derivePriceLists()); await new Promise((r) => setTimeout(r, 300)) }, []))
+  const initial = React.useMemo(() => safeDerivePriceLists(), [])
+  const [rows, setRows] = React.useState<Row[]>(initial.rows)
+  const [loadError, setLoadError] = React.useState<string | null>(initial.error)
+  useRegisterPageRefresh(React.useCallback(async () => {
+    const next = safeDerivePriceLists()
+    setRows(next.rows)
+    setLoadError(next.error)
+    await new Promise((r) => setTimeout(r, 300))
+  }, []))
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -100,7 +115,15 @@ export default function PriceLists() {
           </Link>
         </div>
 
-        {filtered.length === 0 ? (
+        {loadError ? (
+          <Card><CardContent className="p-0">
+            <EmptyState
+              Icon={TagsIcon}
+              title="Couldn't load price tiers"
+              description={loadError}
+            />
+          </CardContent></Card>
+        ) : filtered.length === 0 ? (
           <Card><CardContent className="p-0">
             <EmptyState Icon={TagsIcon} title="No price lists match" description="Try a different name." />
           </CardContent></Card>
