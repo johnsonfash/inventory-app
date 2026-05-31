@@ -58,8 +58,11 @@ export default function TransactionsPage() {
     return list
   }, [rows, query, filter])
 
-  const sales = rows.filter((r) => r.type === "invoice").reduce((s, r) => s + r.total, 0)
-  const refunds = rows.filter((r) => r.type === "return").reduce((s, r) => s + Math.abs(r.total), 0)
+  // Summary follows the active filter — if the cashier is looking at
+  // "Refunds only", the strip totals match what's on screen instead of
+  // showing all-time numbers that don't reconcile with the rows below.
+  const sales = filtered.filter((r) => r.type === "invoice").reduce((s, r) => s + r.total, 0)
+  const refunds = filtered.filter((r) => r.type === "return").reduce((s, r) => s + Math.abs(r.total), 0)
   const net = sales - refunds
 
   return (
@@ -80,7 +83,7 @@ export default function TransactionsPage() {
             { label: "Gross sales", value: formatPrice(sales), tone: "success", hint: "this period" },
             { label: "Refunds", value: formatPrice(refunds), tone: "danger", hint: "this period" },
             { label: "Net", value: formatPrice(net), tone: "brand", hint: "after returns" },
-            { label: "Transactions", value: String(rows.length), tone: "info", hint: "total" },
+            { label: "Transactions", value: String(filtered.length), tone: "info", hint: filter === "all" ? "total" : `filtered (${filter})` },
           ]}
         />
 

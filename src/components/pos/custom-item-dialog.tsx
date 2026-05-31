@@ -106,12 +106,17 @@ export function CustomItemDialog({ open, onClose, onSubmit, scannedCode, default
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                   placeholder="0.00"
-                  min={0}
+                  min={0.01}
                   step="0.01"
                   className="h-full w-full bg-transparent px-2 text-sm outline-none"
                   onKeyDown={(e) => e.key === "Enter" && submit()}
                 />
               </div>
+              {price !== "" && priceNum <= 0 && (
+                <p className="mt-1 text-[10px] font-medium text-rose-600 dark:text-rose-400">
+                  Price must be greater than 0.
+                </p>
+              )}
             </label>
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-muted-foreground">Tax % (opt)</span>

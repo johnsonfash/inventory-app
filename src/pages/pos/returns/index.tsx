@@ -113,6 +113,8 @@ export default function POSReturnsPage() {
               className="pl-9"
             />
           </div>
+          {/* Desktop only — mobile uses the MobileFab below. Don't add
+              another "+" button on mobile or the FAB becomes redundant. */}
           <Link to="/pos/returns/new" className="hidden md:inline-flex">
             <Button><Plus className="h-4 w-4" /> New return</Button>
           </Link>

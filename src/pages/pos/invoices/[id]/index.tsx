@@ -59,7 +59,9 @@ export default function InvoiceDetailPage() {
       dialogTitle: "Share invoice",
     })
     if (res.kind === "copied") toast.success("Invoice link copied")
+    else if (res.kind === "shared") toast.success("Shared via system dialog")
     else if (res.kind === "unavailable") toast.error("Sharing not available on this device")
+    // 'cancelled' is silent — user backed out intentionally.
   }
 
   return (

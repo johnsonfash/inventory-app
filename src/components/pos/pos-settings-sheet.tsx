@@ -75,6 +75,9 @@ export function PosSettingsSheet({
     saveReceiptSettings(part)
   }
   const [printers, setPrinters] = React.useState<{ name: string }[]>([])
+  // Track an in-flight cash-drawer kick so the operator can't double-tap
+  // the button while the printer is still chewing the command.
+  const [drawerOpening, setDrawerOpening] = React.useState(false)
   React.useEffect(() => {
     if (open && canThermalPrint()) listPrinters().then(setPrinters)
   }, [open])
@@ -312,12 +315,20 @@ export function PosSettingsSheet({
                 <Button
                   type="button"
                   variant="outline"
+                  disabled={drawerOpening}
                   onClick={async () => {
-                    const ok = await openCashDrawer()
-                    toast[ok ? "success" : "error"](ok ? "Drawer opened." : "No drawer / printer connected.")
+                    setDrawerOpening(true)
+                    try {
+                      const ok = await openCashDrawer()
+                      toast[ok ? "success" : "error"](
+                        ok ? "Drawer opened." : "No drawer / printer connected.",
+                      )
+                    } finally {
+                      setDrawerOpening(false)
+                    }
                   }}
                 >
-                  Open drawer
+                  {drawerOpening ? "Opening…" : "Open drawer"}
                 </Button>
               </>
             ) : (

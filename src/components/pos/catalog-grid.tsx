@@ -261,8 +261,39 @@ export function CatalogGrid({ catalog, onAdd, cart, onScanRequest, onOverflowReq
       </div>
 
       {filtered.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
-          No products match. Adjust the search or category filter.
+        <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            No products match. Adjust the search or category filter.
+          </p>
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
+            {q && (
+              <button
+                type="button"
+                onClick={() => setQ("")}
+                className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-accent"
+              >
+                Clear search
+              </button>
+            )}
+            {category !== "All" && (
+              <button
+                type="button"
+                onClick={() => setCategory("All")}
+                className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-accent"
+              >
+                Show all products
+              </button>
+            )}
+            {onCustomRequest && (
+              <button
+                type="button"
+                onClick={onCustomRequest}
+                className="rounded-full bg-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground transition-colors hover:bg-brand/90 dark:bg-primary dark:text-primary-foreground"
+              >
+                Add a custom item
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

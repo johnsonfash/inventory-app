@@ -90,11 +90,18 @@ export function ItemOptionsSheet({ item, onClose, onConfirm }: Props) {
       description={chosenVariant ? variantLabel(chosenVariant, axes) : "Choose options"}
       maxHeightVh={86}
       footer={
-        <div className="pb-3">
+        <div className="flex flex-col gap-1.5 pb-3">
+          {!requiredOk && (
+            <p className="text-center text-[11px] font-medium text-amber-600 dark:text-amber-400">
+              Choose all required options to continue.
+            </p>
+          )}
           <Button
             type="button"
             className="w-full"
             disabled={!requiredOk}
+            aria-disabled={!requiredOk}
+            title={requiredOk ? undefined : "Pick all required options first"}
             onClick={() => {
               onConfirm(item, { variant: chosenVariant, modifiers: selectedModifiers })
               onClose()

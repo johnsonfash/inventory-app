@@ -48,13 +48,10 @@ export function ManagerPinDialog({
 
   const press = (digit: string) => {
     setError(false)
-    const next = (pin + digit).slice(0, 6)
-    setPin(next)
-    if (next.length >= 4) {
-      // Auto-submit at 4 digits — matches the default PIN length, keeps
-      // the flow one-handed. A longer PIN just keeps appending.
-      if (verifyManagerPin(next)) submit(next)
-    }
+    // No auto-submit — a phantom-tap during a 4-digit auto-confirm would
+    // burn a wrong attempt and reset the keypad with no explanation.
+    // Manager taps OK (or hits Enter on hardware keyboard) when ready.
+    setPin((p) => (p + digit).slice(0, 6))
   }
 
   const cancel = () => {

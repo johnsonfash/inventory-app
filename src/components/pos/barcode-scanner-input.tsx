@@ -37,6 +37,10 @@ export function BarcodeScannerInput({ captureGlobal = true, onScan, placeholder 
     return () => window.removeEventListener("keydown", handler)
   }, [captureGlobal, onScan])
 
+  // Add is disabled when there's nothing to scan — a silent no-op
+  // confused cashiers who tapped twice on a misfired scan.
+  const canSubmit = value.trim().length > 0
+
   return (
     <div className="flex items-center gap-2">
       <Input
@@ -53,7 +57,10 @@ export function BarcodeScannerInput({ captureGlobal = true, onScan, placeholder 
       />
       <button
         type="button"
-        className="rounded-md border px-3 py-2 text-sm hover:bg-accent"
+        disabled={!canSubmit}
+        title={canSubmit ? "Add to cart" : "Type or scan a code first"}
+        aria-label={canSubmit ? "Add to cart" : "Add (disabled — enter a code first)"}
+        className="rounded-md border px-3 py-2 text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
         onClick={() => {
           const code = value.trim()
           if (code) onScan(code)

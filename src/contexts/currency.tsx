@@ -42,6 +42,27 @@ const DEFAULT_CURRENCY: CurrencyCode = "NGN"
 // formatter switches to 0-decimal display for these.
 const ZERO_DECIMAL = new Set<CurrencyCode>(["NGN", "KES", "SLL", "GHS"])
 
+// Common cash-tender denominations per currency. Used by the POS cash
+// step to let the cashier tap "the buyer handed me ₦5,000" without
+// typing. Values are the largest realistic note + a handful of
+// smaller ones so the buttons cover roughly 80% of real-world tenders.
+const CASH_DENOMINATIONS: Record<CurrencyCode, number[]> = {
+  NGN: [500, 1000, 2000, 5000, 10000, 20000],
+  USD: [5, 10, 20, 50, 100, 200],
+  EUR: [5, 10, 20, 50, 100, 200],
+  GBP: [5, 10, 20, 50, 100, 200],
+  ZAR: [5, 10, 20, 50, 100, 200],
+  GHS: [10, 20, 50, 100, 200, 500],
+  KES: [50, 100, 200, 500, 1000, 2000],
+  SLL: [5000, 10000, 20000, 50000, 100000, 200000],
+}
+
+/** Suggested cash-tender buttons for a given currency. Used by the
+ *  CheckoutSheet's cash step. */
+export function cashDenominations(code: CurrencyCode = getCurrentCurrency()): number[] {
+  return CASH_DENOMINATIONS[code] ?? CASH_DENOMINATIONS.USD
+}
+
 /** Sync read for non-React callsites (mock data files, command palette
  *  sources, etc.). Reads localStorage via the kv shim so it stays in
  *  sync with what the provider would resolve. */
@@ -83,6 +104,8 @@ type CurrencyContextType = {
   symbol: string
   formatPrice: (n: number | null | undefined) => string
   formatCompact: (n: number | null | undefined) => string
+  /** Tap-friendly cash denominations for the current currency. */
+  cashDenominations: number[]
   setCurrency: (code: CurrencyCode) => Promise<void>
 }
 
@@ -97,6 +120,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
       symbol: symbolFor(currency),
       formatPrice: (n) => formatPriceFor(n, currency),
       formatCompact: (n) => formatPriceCompact(n, currency),
+      cashDenominations: cashDenominations(currency),
       setCurrency: async (code: CurrencyCode) => {
         await kv.set(STORAGE_KEY, code)
         setCurrencyState(code)
@@ -119,6 +143,7 @@ export function useCurrency(): CurrencyContextType {
     symbol: symbolFor(fallback),
     formatPrice: (n) => formatPriceFor(n, fallback),
     formatCompact: (n) => formatPriceCompact(n, fallback),
+    cashDenominations: cashDenominations(fallback),
     setCurrency: async () => {
       // outside provider — no-op
     },

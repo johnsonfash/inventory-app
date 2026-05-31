@@ -1,10 +1,16 @@
 import * as React from "react"
 import { Minus, Percent, Plus, Tag, Trash2 } from "lucide-react"
+import { toast } from "sonner"
 import { lineDiscountValue, lineNet, type CartItem } from "@/lib/pos/storage"
 import { modifiersLabel } from "@/lib/pos/variants"
 import { Input } from "@/components/ui/input"
 import { useCurrency } from "@/contexts/currency"
 import { cn } from "@/lib/utils"
+
+// Sanity cap so a slipped-thumb 99999 doesn't ring up an impossible
+// line. Real per-SKU stock limits will flow in once the catalog gains
+// on-hand qty per location; until then this is just a guardrail.
+const MAX_LINE_QTY = 1000
 
 type Totals = {
   subtotal: number
@@ -148,7 +154,19 @@ export function CartContent({
                       placeholder="0"
                       value={c.qty === 0 ? "" : c.qty}
                       min={0}
-                      onChange={(e) => onUpdateQty(c.id, e.target.value === "" ? 0 : Number(e.target.value) || 0)}
+                      max={MAX_LINE_QTY}
+                      onChange={(e) => {
+                        if (e.target.value === "") {
+                          onUpdateQty(c.id, 0)
+                          return
+                        }
+                        const raw = Number(e.target.value) || 0
+                        const next = Math.min(MAX_LINE_QTY, Math.max(0, raw))
+                        if (raw > MAX_LINE_QTY) {
+                          toast.warning(`Capped at ${MAX_LINE_QTY} per line.`)
+                        }
+                        onUpdateQty(c.id, next)
+                      }}
                       className="h-8 w-12 border-0 bg-transparent text-center text-sm tabular-nums outline-none"
                     />
                     <button

@@ -7,7 +7,8 @@ import { CatalogGrid } from "@/components/pos/catalog-grid"
 import { CheckoutSheet } from "@/components/pos/checkout-sheet"
 import { CustomItemDialog, type CustomItemDraft } from "@/components/pos/custom-item-dialog"
 import { FloatingCart } from "@/components/pos/floating-cart"
-import { InvoicePreview, ReceiptPreview, printInvoiceNode } from "@/components/pos/invoice-print"
+import { InvoicePreview, printInvoiceNode } from "@/components/pos/invoice-print"
+import { SaleCompleteSheet } from "@/components/pos/sale-complete-sheet"
 import { ItemOptionsSheet, type ItemSelection } from "@/components/pos/item-options-sheet"
 import { ManagerPinDialog, type PinRequest } from "@/components/pos/manager-pin-dialog"
 import { PosSettingsSheet } from "@/components/pos/pos-settings-sheet"
@@ -55,7 +56,6 @@ import { loadTiers, tierMultiplier } from "@/lib/pos/pricing-tiers"
 import {
   canCameraScan,
   openCashDrawer,
-  printInvoiceThermal,
   scanWithCamera,
 } from "@/lib/pos/hardware"
 import { loadReceiptSettings } from "@/lib/pos/receipt-settings"
@@ -70,7 +70,6 @@ import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import {
   Barcode,
-  CheckCircle2,
   ChevronRight,
   ClipboardList,
   FileText,
@@ -784,6 +783,11 @@ export default function PointOfSale() {
               <BarcodeScannerInput
                 captureGlobal={globalScan}
                 onScan={(code) => {
+                  // Brief acknowledgement toast so the cashier sees the
+                  // scan was received even when the lookup is async or
+                  // the options sheet doesn't open (item-not-found
+                  // dialog opens instead, etc).
+                  toast.success(`Scanned ${code}`, { duration: 1200 })
                   addByBarcode(code)
                   setMobileScanOpen(false)
                 }}
@@ -968,63 +972,28 @@ export default function PointOfSale() {
       </Dialog>
 
       {/* Receipt dialog after a successful sale */}
-      <Dialog open={receiptOpen} onOpenChange={setReceiptOpen}>
-        <DialogContent className="max-w-md">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-              <p className="text-base font-semibold">Sale complete</p>
-            </div>
-            {lastInvoice && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  navigate(`/pos/returns/new?invoiceId=${encodeURIComponent(lastInvoice.id)}`)
-                }
-              >
-                Refund
-              </Button>
-            )}
-          </div>
-          {lastInvoice ? (
-            <div id="receipt-root">
-              <ReceiptPreview invoice={lastInvoice} gift={giftReceipt} />
-            </div>
-          ) : (
-            <div className="text-sm text-muted-foreground">No receipt to show.</div>
-          )}
-          <label className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={giftReceipt}
-              onChange={(e) => setGiftReceipt(e.target.checked)}
-              className="h-4 w-4 accent-[var(--brand)]"
-            />
-            Gift receipt (hide prices, show return-by date)
-          </label>
-          <div className="mt-3 flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={async () => {
-                // Try the thermal printer first; fall back to the browser
-                // print dialog when there's no printer / on web.
-                if (lastInvoice) {
-                  const ok = await printInvoiceThermal(lastInvoice, { gift: giftReceipt })
-                  if (ok) return
-                }
-                const node = document.getElementById("receipt-root")
-                if (node) printInvoiceNode(node)
-              }}
-            >
-              <Printer className="h-4 w-4" /> Print
-            </Button>
-            <Button type="button" onClick={() => setReceiptOpen(false)}>Done</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <SaleCompleteSheet
+        open={receiptOpen}
+        onClose={() => setReceiptOpen(false)}
+        invoice={lastInvoice}
+        giftReceipt={giftReceipt}
+        onGiftReceiptChange={setGiftReceipt}
+        onRefund={
+          lastInvoice
+            ? () => {
+                setReceiptOpen(false)
+                navigate(`/pos/returns/new?invoiceId=${encodeURIComponent(lastInvoice.id)}`)
+              }
+            : undefined
+        }
+        onNewSale={() => {
+          // Cart was already cleared on completion; just close the
+          // sheet so the cashier lands back on the catalog ready to
+          // ring up the next customer.
+          setReceiptOpen(false)
+        }}
+      />
+
 
       {/* POS-1: custom/open item */}
       <CustomItemDialog

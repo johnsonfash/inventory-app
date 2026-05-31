@@ -78,11 +78,11 @@ export function FloatingCart({ itemCount, total, onOpen }: Props) {
               </>
             ) : (
               <>
-                <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-brand dark:text-primary">
                   Cart · empty
                 </span>
-                <span className="block text-sm font-semibold leading-tight text-foreground">
-                  Tap items to start ringing up
+                <span className="block text-sm font-bold leading-tight text-foreground">
+                  Tap a product to start ringing up
                 </span>
               </>
             )}

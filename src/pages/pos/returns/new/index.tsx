@@ -95,7 +95,7 @@ export default function NewReturnPage() {
     if (!num) return
     const inv = getInvoiceByNumber(num)
     if (!inv) {
-      setLookupError(`No invoice found matching "${num}".`)
+      setLookupError(`Invoice "${num}" not found — check the number and try again.`)
       return
     }
     setLookupError(null)

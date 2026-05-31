@@ -122,6 +122,7 @@ export default function POSInvoicesPage() {
     win.focus()
     win.print()
     setTimeout(() => win.close(), 300)
+    toast.success(`Sent ${selectedInvoices.length} invoice${selectedInvoices.length === 1 ? "" : "s"} to print.`)
   }
 
   const bulkEmail = () =>
