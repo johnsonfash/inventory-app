@@ -15,8 +15,27 @@ import { FormAside } from "@/components/forms/form-aside"
 import { InputAddon } from "@/components/forms/input-addon"
 import { useAutoMarkStep } from "@/hooks/use-auto-mark-step"
 import { useCurrency } from "@/contexts/currency"
+import { kvJson } from "@/lib/storage/kv"
 
 type Line = { id: string; sku: string; qty: number; cost: number }
+
+// Mirror of POSeed exported by /reporting/reorder. Kept inline so this
+// page doesn't import a report-only module.
+type POSeed = {
+  vendorSlug: string
+  vendorName: string
+  createdAt: number
+  source: "reorder-report"
+  lines: { sku: string; name: string; qty: number; cost: number }[]
+}
+
+const PO_SEED_KEY = "pallio:purchasing:po-draft-seed"
+
+// Vendors the form's Select dropdown knows about. The select stays the
+// source of truth — when the seed's slug matches one of these we use
+// it, otherwise we fall back to the closest name match (vendors named
+// in the reorder report aren't always pre-saved in the form).
+const VENDOR_SLUGS = ["cobalt", "delta", "glow", "porcel"] as const
 
 let lineSeq = 0
 const newLine = (): Line => ({ id: `L-${++lineSeq}`, sku: "", qty: 1, cost: 0 })
@@ -25,8 +44,42 @@ export default function NewPO() {
   useAutoMarkStep("first-po")
   const navigate = useNavigate()
   const [lines, setLines] = React.useState<Line[]>([newLine()])
+  const [vendor, setVendor] = React.useState<string>("cobalt")
   const [submitting, setSubmitting] = React.useState(false)
   const { formatPrice, symbol } = useCurrency()
+
+  // F3 micro-fix: consume the reorder-report seed once on mount and
+  // clear it so a page refresh doesn't re-hydrate stale data.
+  React.useEffect(() => {
+    const seed = kvJson.get<POSeed>(PO_SEED_KEY)
+    if (!seed) return
+    void kvJson.remove(PO_SEED_KEY)
+    // Vendor: match the seed's slug if it's in our known list, else
+    // fall back to a name-substring match. If neither hits we leave
+    // the dropdown alone — the operator can pick manually.
+    const slugMatch = (VENDOR_SLUGS as readonly string[]).includes(seed.vendorSlug)
+      ? seed.vendorSlug
+      : undefined
+    if (slugMatch) {
+      setVendor(slugMatch)
+    } else {
+      const nameMatch = VENDOR_SLUGS.find((v) =>
+        seed.vendorName.toLowerCase().includes(v),
+      )
+      if (nameMatch) setVendor(nameMatch)
+    }
+    if (seed.lines.length > 0) {
+      setLines(
+        seed.lines.map((l) => ({
+          id: `L-${++lineSeq}`,
+          sku: l.sku,
+          qty: l.qty,
+          cost: l.cost,
+        })),
+      )
+    }
+    toast.success(`Reorder draft loaded from ${seed.vendorName}.`)
+  }, [])
 
   const subtotal = lines.reduce((s, l) => s + l.qty * l.cost, 0)
   const tax = subtotal * 0.075
@@ -92,7 +145,7 @@ export default function NewPO() {
             required
             tooltip="The supplier you're buying from. Pallio uses their saved payment terms + lead times to pre-fill the rest of this form."
           >
-            <Select defaultValue="cobalt">
+            <Select value={vendor} onValueChange={setVendor}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="cobalt">Cobalt Distributors</SelectItem>

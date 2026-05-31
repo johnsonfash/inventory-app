@@ -8,13 +8,17 @@ import {
   Download,
   Edit3,
   ExternalLink,
+  Gift,
   Mail,
   MessageSquare,
   Package,
   Phone,
+  Plus,
   ShoppingBag,
+  Sparkles,
   Trash2,
   TrendingUp,
+  Wallet,
 } from "lucide-react"
 import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
@@ -23,8 +27,19 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
 import { EmptyState } from "@/components/lists/empty-state"
 import { Avatar } from "@/components/avatar"
+import { Input } from "@/components/ui/input"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useCurrency } from "@/contexts/currency"
+import { useTerm } from "@/hooks/use-industry"
+import {
+  addStoreCredit,
+  getLoyalty,
+  listGiftCards,
+  loadLoyaltyRules,
+  loyaltyIdFor,
+  redeemPointsForCredit,
+  type GiftCard,
+} from "@/lib/pos/loyalty"
 import { toast } from "sonner"
 
 // Single-customer detail. Reachable from /sales/customers via slug.
@@ -105,7 +120,12 @@ export default function CustomerDetail() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
   const { formatPrice } = useCurrency()
+  const customerTerm = useTerm("customer", "Customer")
   const [confirmDelete, setConfirmDelete] = React.useState(false)
+  // Bumped after a loyalty mutation so derived numbers refresh from kv.
+  const [loyaltyTick, setLoyaltyTick] = React.useState(0)
+  const [addCreditOpen, setAddCreditOpen] = React.useState(false)
+  const [creditAmount, setCreditAmount] = React.useState("")
 
   const customer = CUSTOMERS.find((c) => c.slug === id)
 
@@ -136,6 +156,62 @@ export default function CustomerDetail() {
     customer.lastOrderDaysAgo === 0 ? "Today"
     : customer.lastOrderDaysAgo === 1 ? "Yesterday"
     : `${customer.lastOrderDaysAgo} days ago`
+
+  // Loyalty + store credit + gift cards (F7). Re-read each render
+  // (cheap kv read) so redeem / add-credit actions reflect instantly.
+  const loyaltyId = loyaltyIdFor({ email: customer.email, phone: customer.phone })
+  // loyaltyTick is read so the lint rule keeps it in the dep graph —
+  // bumping it forces this block to recompute when we mutate kv.
+  void loyaltyTick
+  const loyaltyAccount = loyaltyId ? getLoyalty(loyaltyId) : undefined
+  const rules = loadLoyaltyRules()
+  const customerGiftCards: GiftCard[] = React.useMemo(() => {
+    const email = customer.email?.toLowerCase()
+    const phone = customer.phone
+    return listGiftCards().filter((g) => {
+      if (!g.customer) return false
+      if (email && g.customer.email?.toLowerCase() === email) return true
+      if (phone && g.customer.phone === phone) return true
+      if (g.customer.name && g.customer.name === customer.name) return true
+      return false
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customer.email, customer.phone, customer.name, loyaltyTick])
+
+  const onRedeemPoints = () => {
+    if (!loyaltyId || !loyaltyAccount) {
+      toast("Attach an email or phone to enrol this customer in loyalty.")
+      return
+    }
+    if (loyaltyAccount.points < rules.minPointsToRedeem) {
+      toast(`Needs at least ${rules.minPointsToRedeem} points to redeem.`)
+      return
+    }
+    const { credit } = redeemPointsForCredit(loyaltyId, loyaltyAccount.points)
+    if (credit > 0) {
+      setLoyaltyTick((t) => t + 1)
+      toast.success(`Redeemed ${loyaltyAccount.points} points for ${formatPrice(credit)} store credit.`)
+    } else {
+      toast.error("Couldn't redeem — check the loyalty rules.")
+    }
+  }
+
+  const onAddManualCredit = () => {
+    if (!loyaltyId) {
+      toast("Customer needs an email or phone for store credit.")
+      return
+    }
+    const amt = Number(creditAmount) || 0
+    if (amt <= 0) {
+      toast.error("Enter an amount greater than zero.")
+      return
+    }
+    addStoreCredit(loyaltyId, customer.name, amt)
+    setLoyaltyTick((t) => t + 1)
+    setCreditAmount("")
+    setAddCreditOpen(false)
+    toast.success(`Added ${formatPrice(amt)} store credit for ${customer.name}.`)
+  }
 
   const onCall = () => {
     if (!customer.phone) return toast("No phone number on file.")
@@ -256,6 +332,109 @@ export default function CustomerDetail() {
           <Kpi Icon={Package} label="Avg. order value" value={formatPrice(aov)} tone="info" />
           <Kpi Icon={Calendar} label="Last order" value={lastOrderLabel} tone={customer.lastOrderDaysAgo > 90 ? "warning" : "neutral"} />
         </div>
+
+        {/* F7: Loyalty + store credit + gift cards. Always shown — even
+            for a customer with no enrolment yet, the empty state nudges
+            the operator to attach an email/phone. */}
+        <Card>
+          <CardContent className="p-4 md:p-5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold md:text-base">Loyalty & value instruments</h2>
+                <p className="text-[11px] text-muted-foreground">
+                  Points, store credit, and gift cards issued to this {customerTerm.toLowerCase()}.
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => setAddCreditOpen(true)}>
+                <Plus className="h-3.5 w-3.5" /> Add credit
+              </Button>
+            </div>
+
+            {!loyaltyId ? (
+              <div className="mt-3 rounded-xl border border-dashed border-border bg-muted/30 p-4 text-center">
+                <p className="text-sm font-semibold">No loyalty profile yet.</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Add an email or phone in their contact details to start awarding points.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <ValueTile
+                  Icon={Sparkles}
+                  label="Loyalty points"
+                  value={String(loyaltyAccount?.points ?? 0)}
+                  hint={
+                    rules.earnEnabled
+                      ? `${rules.pointsPerCurrencyUnit} pt per unit spent`
+                      : "Earning is paused"
+                  }
+                />
+                <ValueTile
+                  Icon={Wallet}
+                  label="Store credit"
+                  value={formatPrice(loyaltyAccount?.storeCredit ?? 0)}
+                  hint="Usable as tender at the till"
+                />
+                <ValueTile
+                  Icon={Gift}
+                  label="Active gift cards"
+                  value={String(customerGiftCards.filter((g) => g.status === "active").length)}
+                  hint={`${customerGiftCards.length} issued total`}
+                />
+              </div>
+            )}
+
+            {loyaltyAccount && loyaltyAccount.points > 0 && (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-muted/30 p-3 text-xs">
+                <span className="text-muted-foreground">
+                  {loyaltyAccount.points >= rules.minPointsToRedeem
+                    ? `${loyaltyAccount.points} points ≈ ${formatPrice(Math.round(loyaltyAccount.points * rules.redeemRate * 100) / 100)} store credit`
+                    : `Needs ${rules.minPointsToRedeem - loyaltyAccount.points} more pts to redeem`}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={loyaltyAccount.points < rules.minPointsToRedeem}
+                  onClick={onRedeemPoints}
+                >
+                  Redeem points → store credit
+                </Button>
+              </div>
+            )}
+
+            {customerGiftCards.length > 0 && (
+              <div className="mt-4">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Gift cards
+                </p>
+                <ul className="divide-y divide-border rounded-xl border border-border bg-card">
+                  {customerGiftCards.map((g) => (
+                    <li key={g.code} className="flex items-center gap-3 px-3 py-2.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand dark:bg-primary/15 dark:text-primary">
+                        <Gift className="h-3.5 w-3.5" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-mono text-xs font-semibold">
+                          {maskCardCode(g.code)}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Issued {formatPrice(g.originalAmount)} ·{" "}
+                          {new Date(g.issuedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold tabular-nums">{formatPrice(g.currentBalance)}</p>
+                        <StatusBadge tone={giftStatusTone(g.status)} withDot>
+                          {g.status}
+                        </StatusBadge>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Order history */}
         <Card>
@@ -382,7 +561,81 @@ export default function CustomerDetail() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* F7: manual store-credit add — admin / goodwill credit. */}
+      <Dialog open={addCreditOpen} onOpenChange={(o) => !o && setAddCreditOpen(false)}>
+        <DialogContent className="max-w-sm">
+          <div className="flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400">
+              <Wallet className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-base font-semibold">Add manual credit</p>
+              <p className="text-[11px] text-muted-foreground">
+                Admin action — usually a goodwill gesture or refund-as-credit. Logged on the customer.
+              </p>
+            </div>
+          </div>
+          <label className="mt-4 block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">Amount</span>
+            <Input
+              type="number"
+              inputMode="decimal"
+              value={creditAmount}
+              onChange={(e) => setCreditAmount(e.target.value)}
+              placeholder="0.00"
+              min={0}
+              step="0.01"
+              autoFocus
+              onKeyDown={(e) => e.key === "Enter" && onAddManualCredit()}
+            />
+          </label>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setAddCreditOpen(false)}>Cancel</Button>
+            <Button type="button" variant="destructive" onClick={onAddManualCredit} disabled={!(Number(creditAmount) > 0)}>
+              Add credit
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </PageShell>
+  )
+}
+
+// Hide all but the last 4 chars of a gift-card code in operator views.
+function maskCardCode(code: string): string {
+  const last4 = code.slice(-4)
+  return `${"•".repeat(Math.max(0, code.length - 4))}${last4}`
+}
+
+function giftStatusTone(status: GiftCard["status"]): StatusTone {
+  if (status === "active") return "success"
+  if (status === "redeemed") return "warning"
+  return "danger"
+}
+
+function ValueTile({
+  Icon,
+  label,
+  value,
+  hint,
+}: {
+  Icon: React.ComponentType<{ className?: string }>
+  label: string
+  value: string
+  hint: string
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-soft text-brand dark:bg-primary/15 dark:text-primary">
+          <Icon className="h-3.5 w-3.5" />
+        </span>
+      </div>
+      <p className="mt-1.5 text-lg font-bold tabular-nums">{value}</p>
+      <p className="text-[11px] text-muted-foreground">{hint}</p>
+    </div>
   )
 }
 

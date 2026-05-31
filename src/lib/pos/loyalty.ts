@@ -110,6 +110,56 @@ export function saveLoyaltyConfig(next: Partial<LoyaltyConfig>) {
   void kvJson.set(LOYALTY_CONFIG_KEY, { ...loyaltyConfig(), ...next })
 }
 
+// ---------------- Operator-tunable rules (F7) ----------------
+//
+// Adds a second config layer for the operator-facing settings page
+// (/settings/loyalty). The "Earn enabled" toggle and minimum-points
+// threshold sit here instead of LoyaltyConfig so the existing
+// pointsPerCurrencyUnit + redeemRate plumbing stays untouched — both
+// reads merge for callers that want a single rules view.
+export type LoyaltyRules = {
+  pointsPerCurrencyUnit: number
+  redeemRate: number
+  /** Minimum points balance required before redemption is allowed. */
+  minPointsToRedeem: number
+  /** Operator switch to pause new point accrual without resetting balances. */
+  earnEnabled: boolean
+}
+
+const LOYALTY_RULES_KEY = "pallio:loyalty:rules"
+
+export const DEFAULT_LOYALTY_RULES: LoyaltyRules = {
+  pointsPerCurrencyUnit: DEFAULT_LOYALTY_CONFIG.pointsPerCurrencyUnit,
+  redeemRate: DEFAULT_LOYALTY_CONFIG.redeemRate,
+  minPointsToRedeem: 100,
+  earnEnabled: true,
+}
+
+export function loadLoyaltyRules(): LoyaltyRules {
+  const stored = kvJson.get<Partial<LoyaltyRules>>(LOYALTY_RULES_KEY) ?? {}
+  const cfg = loyaltyConfig()
+  // The legacy LoyaltyConfig wins if rules haven't been set yet; once
+  // the operator edits the rules page, the rules override.
+  return {
+    pointsPerCurrencyUnit: stored.pointsPerCurrencyUnit ?? cfg.pointsPerCurrencyUnit,
+    redeemRate: stored.redeemRate ?? cfg.redeemRate,
+    minPointsToRedeem: stored.minPointsToRedeem ?? DEFAULT_LOYALTY_RULES.minPointsToRedeem,
+    earnEnabled: stored.earnEnabled ?? DEFAULT_LOYALTY_RULES.earnEnabled,
+  }
+}
+
+export function saveLoyaltyRules(next: Partial<LoyaltyRules>) {
+  const merged = { ...loadLoyaltyRules(), ...next }
+  void kvJson.set(LOYALTY_RULES_KEY, merged)
+  // Mirror the two shared knobs into LoyaltyConfig so the till and
+  // existing earnPoints/redeemPointsForCredit reads stay in sync
+  // without code changes elsewhere.
+  saveLoyaltyConfig({
+    pointsPerCurrencyUnit: merged.pointsPerCurrencyUnit,
+    redeemRate: merged.redeemRate,
+  })
+}
+
 export function listLoyalty(): LoyaltyAccount[] {
   return kvJson.get<LoyaltyAccount[]>(LOYALTY_KEY) ?? []
 }
@@ -149,7 +199,10 @@ export function earnPoints(
 ): number {
   const id = loyaltyIdFor(customer)
   if (!id) return 0
-  const earned = Math.floor(amountSpent * loyaltyConfig().pointsPerCurrencyUnit)
+  const rules = loadLoyaltyRules()
+  // Operator can pause accrual without affecting existing balances.
+  if (!rules.earnEnabled) return 0
+  const earned = Math.floor(amountSpent * rules.pointsPerCurrencyUnit)
   if (earned <= 0) return 0
   upsertLoyalty(id, customer?.name, (a) => {
     a.points += earned
@@ -161,7 +214,11 @@ export function earnPoints(
 export function redeemPointsForCredit(id: string, points: number): { credit: number; account?: LoyaltyAccount } {
   const acct = getLoyalty(id)
   if (!acct || points <= 0 || acct.points < points) return { credit: 0, account: acct }
-  const credit = Math.round(points * loyaltyConfig().redeemRate * 100) / 100
+  const rules = loadLoyaltyRules()
+  // Enforce the operator-tunable minimum-balance threshold so a
+  // 12-point account doesn't dribble redemption into 12 NGN credit.
+  if (acct.points < rules.minPointsToRedeem) return { credit: 0, account: acct }
+  const credit = Math.round(points * rules.redeemRate * 100) / 100
   const updated = upsertLoyalty(id, acct.name, (a) => {
     a.points -= points
     a.storeCredit = Math.round((a.storeCredit + credit) * 100) / 100

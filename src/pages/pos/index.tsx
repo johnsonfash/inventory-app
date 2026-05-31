@@ -52,6 +52,7 @@ import {
   useStoreCredit,
 } from "@/lib/pos/loyalty"
 import { SellGiftCardDialog } from "@/components/pos/sell-gift-card-dialog"
+import { GiftCardLookupDialog } from "@/components/pos/gift-card-lookup-dialog"
 import { RecallQuoteDialog } from "@/components/pos/recall-quote-dialog"
 import { loadTiers, tierMultiplier } from "@/lib/pos/pricing-tiers"
 import {
@@ -80,7 +81,8 @@ import {
   LayoutGrid,
   Printer,
   RotateCcw,
-  Settings2
+  Settings2,
+  Wallet
 } from "lucide-react"
 import * as React from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
@@ -172,6 +174,7 @@ export default function PointOfSale() {
   // POS-2: item with variants/modifiers awaiting an options pick.
   const [optionsItem, setOptionsItem] = React.useState<CatalogItem | null>(null)
   const [sellGiftCardOpen, setSellGiftCardOpen] = React.useState(false)
+  const [giftLookupOpen, setGiftLookupOpen] = React.useState(false)
   const [recallOpen, setRecallOpen] = React.useState(false)
   // POS-4: the open order (table/tab) being settled, if we arrived via
   // /pos?orderId=. Cleared (and the spot freed) once the sale completes.
@@ -628,14 +631,24 @@ export default function PointOfSale() {
         </>
       }
       mobileTrailing={
-        <button
-          type="button"
-          onClick={() => setSettingsOpen(true)}
-          aria-label="POS settings"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full text-foreground/80 hover:bg-accent active:bg-accent/70"
-        >
-          <Settings2 className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setGiftLookupOpen(true)}
+            aria-label="Check gift card balance"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-foreground/80 hover:bg-accent active:bg-accent/70"
+          >
+            <Wallet className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="POS settings"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-foreground/80 hover:bg-accent active:bg-accent/70"
+          >
+            <Settings2 className="h-4 w-4" />
+          </button>
+        </div>
       }
     >
       <div className="flex flex-col md:gap-4">
@@ -682,6 +695,7 @@ export default function PointOfSale() {
                 <PosQuickChip Icon={RotateCcw} label="Returns" onClick={() => navigate("/pos/returns")} />
                 <PosQuickChip Icon={FileText} label="Recall quote" onClick={() => setRecallOpen(true)} />
                 <PosQuickChip Icon={Gift} label="Gift card" onClick={() => setSellGiftCardOpen(true)} />
+                <PosQuickChip Icon={Wallet} label="Check gift card" onClick={() => setGiftLookupOpen(true)} />
                 <PosQuickChip Icon={Settings2} label={`${mode} · ${location}`} onClick={() => setSettingsOpen(true)} />
               </div>
 
@@ -847,6 +861,7 @@ export default function PointOfSale() {
             { Icon: RotateCcw, label: "Returns", hint: "Process refunds + exchanges.", onClick: () => { setMobileOverflowOpen(false); navigate("/pos/returns") } },
             { Icon: FileText, label: "Recall quote", hint: "Load a saved quote / order.", onClick: () => { setMobileOverflowOpen(false); setRecallOpen(true) } },
             { Icon: Gift, label: "Sell gift card", hint: "Issue a prepaid card.", onClick: () => { setMobileOverflowOpen(false); setSellGiftCardOpen(true) } },
+            { Icon: Wallet, label: "Check gift card", hint: "Look up a balance + status.", onClick: () => { setMobileOverflowOpen(false); setGiftLookupOpen(true) } },
             { Icon: Settings2, label: `Settings · ${mode}`, hint: location, onClick: () => { setMobileOverflowOpen(false); setSettingsOpen(true) } },
             { Icon: FileText, label: "Invoice preview", hint: cart.length === 0 ? "Add items first." : "Preview before charging.", onClick: () => { if (cart.length > 0) { setMobileOverflowOpen(false); setPreviewOpen(true) } } },
           ].map((a) => (
@@ -1043,6 +1058,13 @@ export default function PointOfSale() {
         open={sellGiftCardOpen}
         onClose={() => setSellGiftCardOpen(false)}
         onConfirm={addGiftCardLine}
+      />
+
+      {/* F7: balance check from the till */}
+      <GiftCardLookupDialog
+        open={giftLookupOpen}
+        onClose={() => setGiftLookupOpen(false)}
+        onSellNew={() => setSellGiftCardOpen(true)}
       />
 
       {/* POS-2: recall a quote/order into the cart */}

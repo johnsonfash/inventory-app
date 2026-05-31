@@ -1,7 +1,7 @@
 
 import * as React from "react"
 import { Link, useSearchParams, useParams } from "react-router-dom"
-import { ArrowLeft, ChevronRight, Mail, Printer, RotateCcw, Share2 } from "lucide-react"
+import { ArrowLeft, ChevronRight, Gift, Mail, Printer, RotateCcw, Share2, Sparkles, Wallet } from "lucide-react"
 import { toast } from "sonner"
 import { PageShell } from "@/components/page-shell"
 import { InvoicePreview, printInvoiceNode } from "@/components/pos/invoice-print"
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { StatusBadge } from "@/components/lists/status-badge"
 import { getInvoiceById, listReturns } from "@/lib/pos/storage"
+import { loadLoyaltyRules } from "@/lib/pos/loyalty"
 import { useShare } from "@/hooks/use-share"
 import { useCurrency } from "@/contexts/currency"
 
@@ -98,6 +99,56 @@ export default function InvoiceDetailPage() {
       <div ref={ref}>
         <InvoicePreview invoice={invoice} />
       </div>
+
+      {/* F7: loyalty + value-instrument summary. Inline rows, kept
+          small — the invoice preview above already shows the totals. */}
+      {(() => {
+        const rules = loadLoyaltyRules()
+        const hasCustomerLoyalty =
+          rules.earnEnabled && (invoice.customer?.email || invoice.customer?.phone)
+        const pointsEarned = hasCustomerLoyalty
+          ? Math.floor(invoice.total * rules.pointsPerCurrencyUnit)
+          : 0
+        const giftCardTenders = invoice.payments.filter((p) => p.method === "gift-card")
+        const storeCreditTotal = invoice.payments
+          .filter((p) => p.method === "store-credit")
+          .reduce((s, p) => s + p.amount, 0)
+        if (
+          pointsEarned <= 0 &&
+          giftCardTenders.length === 0 &&
+          storeCreditTotal <= 0
+        ) {
+          return null
+        }
+        return (
+          <div className="mt-3 space-y-1.5 rounded-xl border border-border bg-muted/30 p-3 text-xs">
+            {pointsEarned > 0 && (
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-brand dark:text-primary" />
+                <span className="text-muted-foreground">
+                  +<span className="font-semibold text-foreground">{pointsEarned}</span> loyalty points earned
+                </span>
+              </div>
+            )}
+            {giftCardTenders.map((p, idx) => (
+              <div key={`gc-${idx}`} className="flex items-center gap-2">
+                <Gift className="h-3.5 w-3.5 text-brand dark:text-primary" />
+                <span className="text-muted-foreground">
+                  Gift card applied: <span className="font-mono font-semibold text-foreground">✦{(p.reference || "").slice(-4) || "????"}</span> ({formatPrice(p.amount)})
+                </span>
+              </div>
+            ))}
+            {storeCreditTotal > 0 && (
+              <div className="flex items-center gap-2">
+                <Wallet className="h-3.5 w-3.5 text-brand dark:text-primary" />
+                <span className="text-muted-foreground">
+                  Store credit applied: <span className="font-semibold text-foreground">{formatPrice(storeCreditTotal)}</span>
+                </span>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Related returns */}
       {refundsAgainst.length > 0 && (
