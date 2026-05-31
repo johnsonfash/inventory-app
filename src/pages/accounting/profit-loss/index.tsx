@@ -10,7 +10,8 @@ import { ConnectionCard } from "@/components/integrations/connection-chip"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import { useCurrency } from "@/contexts/currency"
 import { cn } from "@/lib/utils"
-import { profitAndLoss, seedExampleLedger } from "@/lib/accounting/ledger"
+import { toast } from "sonner"
+import { balanceSheet, profitAndLoss, seedExampleLedger, trialBalance } from "@/lib/accounting/ledger"
 
 type Row = { name: string; amount: number; sub?: string; prev?: number }
 
@@ -154,20 +155,34 @@ export default function ProfitLoss() {
       <ConnectionCard providerId="quickbooks" reason="Push this P&L straight into QuickBooks every month-end — no manual journal entries." />
 
       <div className="grid gap-2 sm:grid-cols-3">
-        {[
-          { Icon: FileText, label: "Balance sheet", body: "Snapshot of assets + liabilities.",     href: "/accounting/balance-sheet" },
-          { Icon: ArrowUpRight, label: "Cash flow",  body: "Where the cash actually moved.",       href: "/accounting/cash-flow" },
-          { Icon: Download, label: "Export accountant pack", body: "All four statements as a ZIP.", href: "#" },
-        ].map((q) => (
-          <Link key={q.label} to={q.href} className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:border-brand/40 hover:bg-accent/40">
-            <q.Icon className="h-4 w-4 text-brand dark:text-primary" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">{q.label}</p>
-              <p className="truncate text-[11px] text-muted-foreground">{q.body}</p>
-            </div>
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-          </Link>
-        ))}
+        <Link to="/accounting/balance-sheet" className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:border-brand/40 hover:bg-accent/40">
+          <FileText className="h-4 w-4 text-brand dark:text-primary" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold">Balance sheet</p>
+            <p className="truncate text-[11px] text-muted-foreground">Snapshot of assets + liabilities.</p>
+          </div>
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+        </Link>
+        <Link to="/accounting/cash-flow" className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:border-brand/40 hover:bg-accent/40">
+          <ArrowUpRight className="h-4 w-4 text-brand dark:text-primary" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold">Cash flow</p>
+            <p className="truncate text-[11px] text-muted-foreground">Where the cash actually moved.</p>
+          </div>
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+        </Link>
+        <button
+          type="button"
+          onClick={() => downloadAccountantPack(period)}
+          className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left transition-colors hover:border-brand/40 hover:bg-accent/40"
+        >
+          <Download className="h-4 w-4 text-brand dark:text-primary" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold">Export accountant pack</p>
+            <p className="truncate text-[11px] text-muted-foreground">P&amp;L + balance sheet + trial balance as one CSV.</p>
+          </div>
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+        </button>
       </div>
     </ReportShell>
   )
@@ -266,3 +281,58 @@ function Step({ label, value, bold, tone, formatPrice }: { label: string; value:
 }
 
 void ArrowDownRight
+
+// Concatenates the three core statements (P&L, balance sheet, trial
+// balance) into a single CSV the accountant can drop into Excel.
+// A real ZIP would need an extra dep — one CSV with section headers
+// is the same information without the bundling overhead.
+function downloadAccountantPack(period: Period) {
+  seedExampleLedger()
+  const pl = profitAndLoss()
+  const bs = balanceSheet()
+  const tb = trialBalance()
+
+  const lines: string[] = []
+  const csvCell = (v: unknown) => {
+    if (v == null) return ""
+    const s = String(v)
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const section = (title: string) => { lines.push(""); lines.push(`# ${title}`) }
+  const header = (...cols: string[]) => lines.push(cols.map(csvCell).join(","))
+  const row = (...cols: (string | number)[]) => lines.push(cols.map(csvCell).join(","))
+
+  section("Profit & Loss")
+  header("Section", "Account", "Code", "Amount")
+  pl.income.forEach((l) => row("Income", l.account.name, l.account.code, l.amount))
+  row("Income", "Total income", "", pl.totalIncome)
+  pl.expense.forEach((l) => row("Expense", l.account.name, l.account.code, l.amount))
+  row("Expense", "Total expense", "", pl.totalExpense)
+  row("Net", "Net profit", "", pl.netProfit)
+
+  section("Balance Sheet")
+  header("Section", "Account", "Code", "Amount")
+  bs.assets.forEach((l) => row("Asset", l.account.name, l.account.code, l.amount))
+  row("Asset", "Total assets", "", bs.totalAssets)
+  bs.liabilities.forEach((l) => row("Liability", l.account.name, l.account.code, l.amount))
+  row("Liability", "Total liabilities", "", bs.totalLiabilities)
+  bs.equity.forEach((l) => row("Equity", l.account.name, l.account.code, l.amount))
+  row("Equity", "Total equity", "", bs.totalEquity)
+
+  section("Trial Balance")
+  header("Code", "Account", "Type", "Debit", "Credit", "Balance")
+  tb.rows.forEach((r) => row(r.account.code, r.account.name, r.account.type, r.debit, r.credit, r.balance))
+  row("", "Totals", "", tb.totalDebit, tb.totalCredit, "")
+  row("", `Balanced: ${tb.balanced ? "yes" : "no"}`, "", "", "", "")
+
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `pallio-accountant-pack-${period}.csv`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+  toast.success("Accountant pack downloaded.")
+}

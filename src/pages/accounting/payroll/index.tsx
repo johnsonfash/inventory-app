@@ -20,6 +20,7 @@ import { ReportShell } from "@/components/reports/report-shell"
 import { type Period } from "@/components/reports/period-chips"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
 import { Avatar } from "@/components/avatar"
 import { ConnectionCard } from "@/components/integrations/connection-chip"
@@ -89,6 +90,10 @@ export default function Payroll() {
   const isMobile = useIsMobile()
   const { formatPrice } = useCurrency()
   const [period, setPeriod] = React.useState<Period>("30d")
+  const [previewOpen, setPreviewOpen] = React.useState(false)
+  const [approving, setApproving] = React.useState(false)
+  const [exporting, setExporting] = React.useState(false)
+  const [downloadingRunId, setDownloadingRunId] = React.useState<string | null>(null)
 
   const grossThisMonth = STAFF.reduce((s, e) => s + e.base + e.allowances + e.commission, 0)
   const taxThisMonth   = STAFF.reduce((s, e) => s + e.paye + e.pension + e.nhf, 0)
@@ -145,11 +150,26 @@ export default function Payroll() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => toast.success("Preview generated · review each payslip before approving.")}>
+              <Button size="sm" variant="outline" onClick={() => setPreviewOpen(true)}>
                 <Receipt className="h-3.5 w-3.5" /> Preview payslips
               </Button>
-              <Button size="sm" onClick={() => toast.success("Pay run approved — debits Pallio Wallet on May 31.")}>
-                <Send className="h-3.5 w-3.5" /> Approve + run
+              <Button
+                size="sm"
+                disabled={approving}
+                onClick={async () => {
+                  setApproving(true)
+                  try {
+                    // Mock the debit/run window so the button shows an honest
+                    // loading state — the real backend will replace this with
+                    // the wallet debit + NIBSS batch.
+                    await new Promise((r) => setTimeout(r, 800))
+                    toast.success("Pay run approved — debits Pallio Wallet on May 31.")
+                  } finally {
+                    setApproving(false)
+                  }
+                }}
+              >
+                <Send className={cn("h-3.5 w-3.5", approving && "animate-pulse")} /> {approving ? "Running…" : "Approve + run"}
               </Button>
             </div>
           </div>
@@ -164,8 +184,22 @@ export default function Payroll() {
               <h3 className="text-sm font-semibold md:text-base">Salary register · this month</h3>
               <p className="text-[11px] text-muted-foreground">Each row computed live from base + allowances + commission − deductions.</p>
             </div>
-            <Button size="sm" variant="outline" onClick={() => toast.success("Register exported as XLSX.")}>
-              <Download className="h-3.5 w-3.5" /> Export
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={exporting}
+              onClick={async () => {
+                setExporting(true)
+                try {
+                  await new Promise((r) => setTimeout(r, 300))
+                  downloadRegisterCsv(exportRows)
+                  toast.success("Salary register exported as CSV.")
+                } finally {
+                  setExporting(false)
+                }
+              }}
+            >
+              <Download className={cn("h-3.5 w-3.5", exporting && "animate-pulse")} /> {exporting ? "Preparing…" : "Export"}
             </Button>
           </div>
           {isMobile ? (
@@ -288,8 +322,23 @@ export default function Payroll() {
                     <td className="px-3 py-2.5 text-right text-xs tabular-nums">{formatPrice(r.net)}</td>
                     <td className="px-3 py-2.5"><StatusBadge tone={STATUS_TONE[r.status]} withDot>{r.status}</StatusBadge></td>
                     <td className="px-3 py-2.5 text-right">
-                      <Button size="sm" variant="ghost" onClick={() => toast.success(`Downloaded ${r.id} payslips ZIP.`)}>
-                        <Download className="h-3.5 w-3.5" />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={downloadingRunId === r.id}
+                        aria-label={`Download ${r.id} payslip summary`}
+                        onClick={async () => {
+                          setDownloadingRunId(r.id)
+                          try {
+                            await new Promise((res) => setTimeout(res, 300))
+                            downloadRunSummary(r)
+                            toast.success(`Downloaded ${r.id} payslip summary.`)
+                          } finally {
+                            setDownloadingRunId(null)
+                          }
+                        }}
+                      >
+                        <Download className={cn("h-3.5 w-3.5", downloadingRunId === r.id && "animate-pulse")} />
                       </Button>
                     </td>
                   </tr>
@@ -372,6 +421,12 @@ export default function Payroll() {
           </Link>
         ))}
       </div>
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-3xl">
+          <PayslipPreview staff={STAFF} formatPrice={formatPrice} />
+        </DialogContent>
+      </Dialog>
     </ReportShell>
   )
 }
@@ -396,3 +451,90 @@ function Tile({ label, value, sub, tone }: { label: string; value: string; sub?:
 }
 
 void AlertTriangle; void ArrowRight; void Calendar; void Check
+
+// Payslip preview list — shows the per-employee breakdown the
+// approver would otherwise click "Send" without seeing. Keeps the
+// approve step honest.
+function PayslipPreview({ staff, formatPrice }: { staff: Employee[]; formatPrice: (n: number) => string }) {
+  return (
+    <div className="space-y-3">
+      <div>
+        <h2 className="text-base font-bold">Payslip preview · May 2026</h2>
+        <p className="text-[11px] text-muted-foreground">Review each employee&apos;s net before approving the run. Mirrors the PDF that emails after approval.</p>
+      </div>
+      <ul className="max-h-[60vh] divide-y divide-border overflow-y-auto rounded-xl border border-border">
+        {staff.map((e) => {
+          const gross = e.base + e.allowances + e.commission
+          const ded = e.paye + e.pension + e.nhf
+          const net = gross - ded
+          return (
+            <li key={e.id} className="grid grid-cols-2 gap-y-1 px-3 py-3 text-xs sm:grid-cols-4">
+              <div className="col-span-2 sm:col-span-2">
+                <p className="text-sm font-semibold">{e.name}</p>
+                <p className="text-[11px] text-muted-foreground">{e.role}</p>
+                <p className="text-[10px] text-muted-foreground">{e.bankShort}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Gross</p>
+                <p className="tabular-nums">{formatPrice(gross)}</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Deductions</p>
+                <p className="tabular-nums text-rose-600 dark:text-rose-400">−{formatPrice(ded)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Net pay</p>
+                <p className="text-sm font-bold tabular-nums">{formatPrice(net)}</p>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+function csvFromRows(rows: Record<string, string | number>[]): string {
+  if (rows.length === 0) return ""
+  const esc = (c: unknown) => {
+    const s = String(c ?? "")
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const keys = Object.keys(rows[0]!)
+  return [
+    keys.map(esc).join(","),
+    ...rows.map((r) => keys.map((k) => esc(r[k])).join(",")),
+  ].join("\n")
+}
+
+function triggerDownload(content: string, filename: string) {
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+function downloadRegisterCsv(rows: Record<string, string | number>[]) {
+  const csv = csvFromRows(rows)
+  triggerDownload(csv, `pallio-salary-register-${new Date().toISOString().slice(0, 10)}.csv`)
+}
+
+function downloadRunSummary(r: Run) {
+  const csv = csvFromRows([
+    {
+      run: r.id,
+      period: r.period,
+      paid_date: r.paidDate,
+      employees: r.employees,
+      gross: r.gross,
+      taxes: r.taxes,
+      net: r.net,
+      status: r.status,
+      reference: r.reference ?? "",
+    },
+  ])
+  triggerDownload(csv, `pallio-payroll-${r.id}.csv`)
+}

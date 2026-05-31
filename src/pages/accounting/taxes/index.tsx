@@ -64,6 +64,7 @@ export default function Taxes() {
   const filedYtd  = FILINGS.filter((f) => f.status === "filed").reduce((s, f) => s + f.taxAmount, 0)
   const overdueCount = FILINGS.filter((f) => f.status === "overdue").length
   const draftCount   = FILINGS.filter((f) => f.status === "draft").length
+  const [exporting, setExporting] = React.useState(false)
 
   const exportRows = FILINGS.map((f) => ({
     filing: f.id, kind: f.kind, period: f.period, due: f.due,
@@ -129,8 +130,22 @@ export default function Taxes() {
               <h3 className="text-sm font-semibold md:text-base">Tax filings</h3>
               <p className="text-[11px] text-muted-foreground">VAT + WHT + PAYE + annual CIT — generated from your books.</p>
             </div>
-            <Button size="sm" variant="outline" onClick={() => toast.success("Filings exported · ready for your accountant.")}>
-              <Download className="h-3.5 w-3.5" /> Export
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={exporting}
+              onClick={async () => {
+                setExporting(true)
+                try {
+                  await new Promise((r) => setTimeout(r, 300))
+                  downloadFilingsCsv(exportRows)
+                  toast.success("Filings exported · ready for your accountant.")
+                } finally {
+                  setExporting(false)
+                }
+              }}
+            >
+              <Download className={cn("h-3.5 w-3.5", exporting && "animate-pulse")} /> {exporting ? "Preparing…" : "Export"}
             </Button>
           </div>
           {isMobile ? (
@@ -302,3 +317,22 @@ function Tile({ label, value, sub, tone }: { label: string; value: string; sub?:
 }
 
 void Calendar
+
+function downloadFilingsCsv(rows: Record<string, string | number>[]) {
+  if (rows.length === 0) return
+  const esc = (c: unknown) => {
+    const s = String(c ?? "")
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const keys = Object.keys(rows[0]!)
+  const csv = [keys.map(esc).join(","), ...rows.map((r) => keys.map((k) => esc(r[k])).join(","))].join("\n")
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `pallio-tax-filings-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}

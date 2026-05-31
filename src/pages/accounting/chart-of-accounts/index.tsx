@@ -1,13 +1,11 @@
 import * as React from "react"
 import { Link } from "react-router-dom"
-import { toast } from "sonner"
 import {
   Banknote,
   Building2,
   ChevronDown,
   ChevronRight,
   Download,
-  Edit3,
   FileText,
   Plus,
   Receipt,
@@ -223,7 +221,13 @@ export default function ChartOfAccounts() {
               className="pl-9"
             />
           </div>
-          <Button size="sm" onClick={() => toast("Account creation arrives with the backend.")} className="hidden sm:inline-flex">
+          <Button
+            size="sm"
+            disabled
+            title="Coming soon — custom account creation arrives with the backend."
+            aria-label="Add account (coming soon)"
+            className="hidden sm:inline-flex"
+          >
             <Plus className="h-3.5 w-3.5" /> Add account
           </Button>
         </div>
@@ -277,16 +281,6 @@ export default function ChartOfAccounts() {
                         <span className="flex-1 truncate text-sm font-semibold">{parent.name}</span>
                         {parent.systemOwned && <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300">System</span>}
                         <span className="font-mono text-sm font-bold tabular-nums">{formatPrice(parent.balance)}</span>
-                        {parent.postable && !parent.systemOwned && (
-                          <button
-                            type="button"
-                            onClick={() => toast(`Edit ${parent.code} arrives with the backend.`)}
-                            aria-label="Edit"
-                            className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-                          >
-                            <Edit3 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
                       </li>
                       {hasChildren && isExpanded && children.map((child) => (
                         <li key={child.code} className="flex items-center gap-3 bg-muted/10 px-4 py-2 pl-12 hover:bg-accent/30">
@@ -294,16 +288,6 @@ export default function ChartOfAccounts() {
                           <span className="flex-1 truncate text-sm">{child.name}</span>
                           {child.systemOwned && <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300">System</span>}
                           <span className="font-mono text-xs tabular-nums">{formatPrice(child.balance)}</span>
-                          {child.postable && !child.systemOwned && (
-                            <button
-                              type="button"
-                              onClick={() => toast(`Edit ${child.code} arrives with the backend.`)}
-                              aria-label="Edit"
-                              className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-                            >
-                              <Edit3 className="h-3 w-3" />
-                            </button>
-                          )}
                         </li>
                       ))}
                     </React.Fragment>

@@ -34,6 +34,7 @@ import {
   reverseEntry,
   seedExampleLedger,
   setPeriodLock,
+  trialBalance,
 } from "@/lib/accounting/ledger"
 
 type EntryStatus = "posted" | "draft" | "void"
@@ -102,6 +103,7 @@ export default function JournalEntries() {
   const [query, setQuery] = React.useState("")
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set())
   const [formOpen, setFormOpen] = React.useState(false)
+  const [tbOpen, setTbOpen] = React.useState(false)
   // Real journal entries, rebuilt on refresh / after posting.
   const JOURNALS = React.useMemo(() => deriveJournals(), [version])
   const reload = () => setVersion((v) => v + 1)
@@ -391,25 +393,45 @@ export default function JournalEntries() {
 
       {/* Cross-links */}
       <div className="grid gap-2 sm:grid-cols-3">
-        {[
-          { Icon: FileText, label: "Chart of Accounts", body: "The account list every entry references.", href: "/accounting/chart-of-accounts" },
-          { Icon: Clock,    label: "Reconciliation",     body: "Match Pallio entries against bank statement.", href: "/accounting/reconciliation" },
-          { Icon: Download, label: "Trial balance",      body: "Sum of all account balances — should be zero.", href: "#" },
-        ].map((q) => (
-          <Link key={q.label} to={q.href} className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:border-brand/40 hover:bg-accent/40">
-            <q.Icon className="h-4 w-4 text-brand dark:text-primary" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">{q.label}</p>
-              <p className="truncate text-[11px] text-muted-foreground">{q.body}</p>
-            </div>
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-          </Link>
-        ))}
+        <Link to="/accounting/chart-of-accounts" className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:border-brand/40 hover:bg-accent/40">
+          <FileText className="h-4 w-4 text-brand dark:text-primary" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold">Chart of Accounts</p>
+            <p className="truncate text-[11px] text-muted-foreground">The account list every entry references.</p>
+          </div>
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+        </Link>
+        <Link to="/accounting/reconciliation" className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:border-brand/40 hover:bg-accent/40">
+          <Clock className="h-4 w-4 text-brand dark:text-primary" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold">Reconciliation</p>
+            <p className="truncate text-[11px] text-muted-foreground">Match Pallio entries against bank statement.</p>
+          </div>
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+        </Link>
+        <button
+          type="button"
+          onClick={() => setTbOpen(true)}
+          className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left transition-colors hover:border-brand/40 hover:bg-accent/40"
+        >
+          <Download className="h-4 w-4 text-brand dark:text-primary" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold">Trial balance</p>
+            <p className="truncate text-[11px] text-muted-foreground">Sum of all account balances — should net to zero.</p>
+          </div>
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+        </button>
       </div>
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="max-w-lg">
           <ManualEntryForm onDone={() => { reload(); setFormOpen(false) }} onCancel={() => setFormOpen(false)} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={tbOpen} onOpenChange={setTbOpen}>
+        <DialogContent className="max-w-2xl">
+          <TrialBalanceView formatPrice={formatPrice} />
         </DialogContent>
       </Dialog>
     </ReportShell>
@@ -522,3 +544,56 @@ function Tile({ label, value, sub, tone }: { label: string; value: string; sub?:
 }
 
 void ArrowRight
+
+// Trial balance derived live from the ledger — every account with
+// activity, plus the totals + a balanced/off indicator. Shown in a
+// dialog so the user can sanity-check the books without leaving the
+// journal page.
+function TrialBalanceView({ formatPrice }: { formatPrice: (n: number) => string }) {
+  const tb = React.useMemo(() => trialBalance(), [])
+  return (
+    <div className="space-y-3">
+      <div>
+        <h2 className="text-base font-bold">Trial balance</h2>
+        <p className="text-[11px] text-muted-foreground">
+          Sum of debits + credits across every account with activity. Totals must match — that&apos;s how we know nothing was posted lopsided.
+        </p>
+      </div>
+      <div className="max-h-[60vh] overflow-y-auto rounded-xl border border-border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40 text-left text-[10px] uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2 font-medium">Code</th>
+              <th className="px-3 py-2 font-medium">Account</th>
+              <th className="px-3 py-2 text-right font-medium">Debit</th>
+              <th className="px-3 py-2 text-right font-medium">Credit</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {tb.rows.map((r) => (
+              <tr key={r.account.id} className="hover:bg-accent/30">
+                <td className="px-3 py-2 font-mono text-xs">{r.account.code}</td>
+                <td className="px-3 py-2 text-xs">{r.account.name}</td>
+                <td className="px-3 py-2 text-right text-xs tabular-nums">{r.debit ? formatPrice(r.debit) : "—"}</td>
+                <td className="px-3 py-2 text-right text-xs tabular-nums">{r.credit ? formatPrice(r.credit) : "—"}</td>
+              </tr>
+            ))}
+            {tb.rows.length === 0 && (
+              <tr><td colSpan={4} className="px-3 py-6 text-center text-xs text-muted-foreground">No posted entries yet.</td></tr>
+            )}
+          </tbody>
+          <tfoot className="border-t-2 border-border bg-muted/30 font-bold">
+            <tr>
+              <td className="px-3 py-2 text-xs uppercase tracking-wider" colSpan={2}>Totals</td>
+              <td className="px-3 py-2 text-right text-sm tabular-nums">{formatPrice(tb.totalDebit)}</td>
+              <td className="px-3 py-2 text-right text-sm tabular-nums">{formatPrice(tb.totalCredit)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <StatusBadge tone={tb.balanced ? "success" : "danger"} withDot>
+        {tb.balanced ? "Balanced — debits equal credits" : "Off balance — investigate"}
+      </StatusBadge>
+    </div>
+  )
+}

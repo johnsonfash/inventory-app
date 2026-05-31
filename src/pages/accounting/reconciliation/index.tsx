@@ -4,19 +4,14 @@ import { toast } from "sonner"
 import {
   AlertTriangle,
   ArrowLeftRight,
-  ArrowRight,
   Banknote,
   Check,
   CheckCircle2,
   ChevronRight,
   Circle,
-  Clock,
-  Download,
-  Eye,
   FileText,
   HelpCircle,
   Search,
-  Upload,
   X,
 } from "lucide-react"
 import { ReportShell } from "@/components/reports/report-shell"
@@ -174,9 +169,6 @@ export default function Reconciliation() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => toast("Upload bank statement (CSV/OFX) arrives with the backend.")}>
-                <Upload className="h-3.5 w-3.5" /> Upload statement
-              </Button>
               <Button size="sm" onClick={() => toast.success(`Reconciliation finalised for ${ACCOUNT.statementPeriod}.`)}>
                 <CheckCircle2 className="h-3.5 w-3.5" /> Mark reconciled
               </Button>
@@ -291,35 +283,6 @@ export default function Reconciliation() {
           formatPrice={formatPrice}
         />
       </div>
-
-      {/* Quick fixes for common issues */}
-      <Card>
-        <CardContent className="p-4">
-          <h3 className="text-sm font-semibold md:text-base">Quick fixes</h3>
-          <p className="text-[11px] text-muted-foreground">One-tap actions for the most common reconciliation gaps.</p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              { Icon: ArrowRight, label: "Post bank fee",         body: "Bank charged ₦3,500 — Pallio doesn't know about it yet." },
-              { Icon: Clock,      label: "Mark transfer in transit", body: "Pallio posted a draw the bank hasn't cleared yet." },
-              { Icon: Eye,        label: "Tag unknown deposit",      body: "Walk-in customer · attribute ₦62k to a customer record." },
-              { Icon: Download,   label: "Re-import statement",      body: "Fix an upload error or merge a corrected file." },
-            ].map((q) => (
-              <button
-                key={q.label}
-                type="button"
-                onClick={() => toast(`${q.label} arrives with the backend.`)}
-                className="flex items-start gap-2 rounded-xl border border-border bg-background p-3 text-left transition-colors hover:border-brand/40 hover:bg-accent/40"
-              >
-                <q.Icon className="h-4 w-4 shrink-0 text-brand dark:text-primary" />
-                <div>
-                  <p className="text-sm font-semibold">{q.label}</p>
-                  <p className="text-[11px] text-muted-foreground">{q.body}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* History */}
       <Card>
