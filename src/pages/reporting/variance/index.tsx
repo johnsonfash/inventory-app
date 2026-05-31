@@ -39,7 +39,11 @@ export default function VarianceReport() {
       header: "Variance",
       align: "right",
       render: (r) => (
-        <span className={r.variance < 0 ? "tabular-nums font-semibold text-rose-600 dark:text-rose-400" : "tabular-nums font-semibold text-emerald-600 dark:text-emerald-400"}>
+        <span
+          className={r.variance < 0 ? "tabular-nums font-semibold text-rose-600 dark:text-rose-400" : "tabular-nums font-semibold text-emerald-600 dark:text-emerald-400"}
+          title={r.variance < 0 ? "Unexplained shrinkage — actual count is lower than theoretical" : "Over-counted or recipe over-stated consumption"}
+          aria-label={r.variance < 0 ? "Negative variance (shrinkage)" : "Positive variance (over-count)"}
+        >
           {r.variance > 0 ? `+${r.variance}` : r.variance}
         </span>
       ),

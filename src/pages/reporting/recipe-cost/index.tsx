@@ -1,5 +1,5 @@
 import * as React from "react"
-import { ArrowDown, ArrowUp, Calculator, Workflow, TrendingUp } from "lucide-react"
+import { AlertTriangle, ArrowDown, ArrowUp, Calculator, Workflow, TrendingUp } from "lucide-react"
 import { ReportShell } from "@/components/reports/report-shell"
 import { KpiBand } from "@/components/reports/kpi-band"
 import { DataTable, type Column } from "@/components/reports/data-table"
@@ -72,8 +72,29 @@ export default function RecipeCostWatch() {
 
   const rows: Row[] = React.useMemo(() => {
     return recipes.map((r) => {
-      const current = rollupRecipeCost(r, lookups.byCurrentPrice)
-      const prior = rollupRecipeCost(r, lookups.byMockPriorPrice)
+      // Guard rollup — sub-recipe cycles, missing price lookups, or
+      // malformed seed data can throw. Surface a zero-cost row with a
+      // missing badge instead of crashing the whole report.
+      let current: ReturnType<typeof rollupRecipeCost>
+      let prior: ReturnType<typeof rollupRecipeCost>
+      try {
+        current = rollupRecipeCost(r, lookups.byCurrentPrice)
+        prior = rollupRecipeCost(r, lookups.byMockPriorPrice)
+      } catch {
+        return {
+          id: r.id,
+          name: r.name,
+          parentSku: r.parentSku,
+          yield: r.yield,
+          yieldUnit: r.yieldUnit,
+          currentCost: 0,
+          priorCost: 0,
+          delta: 0,
+          deltaPct: 0,
+          missing: -1,
+          tags: r.tags,
+        }
+      }
       const delta = current.perUnit - prior.perUnit
       const deltaPct = prior.perUnit > 0 ? delta / prior.perUnit : 0
       return {
@@ -104,7 +125,15 @@ export default function RecipeCostWatch() {
       primary: true,
       render: (r) => (
         <Link to={`/inventory/recipes/${r.id}`} className="hover:underline">
-          <span className="text-sm font-medium">{r.name}</span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="text-sm font-medium">{r.name}</span>
+            {r.missing !== 0 && (
+              <StatusBadge tone="warning" withDot>
+                <AlertTriangle className="h-3 w-3" />
+                {r.missing > 0 ? `${r.missing} missing` : "rollup error"}
+              </StatusBadge>
+            )}
+          </span>
           <div className="font-mono text-[10px] text-muted-foreground">{r.parentSku} · {r.yield}{r.yieldUnit}</div>
         </Link>
       ),

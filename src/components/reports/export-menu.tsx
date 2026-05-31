@@ -1,4 +1,4 @@
-import { Download, FileSpreadsheet, FileText, Printer, Share2 } from "lucide-react"
+import { Download, FileSpreadsheet, Printer, Share2 } from "lucide-react"
 import { toast } from "sonner"
 import { Dropdown, DropdownItem } from "@/components/ui/dropdown"
 import { useShare } from "@/hooks/use-share"
@@ -86,10 +86,7 @@ export function ExportMenu({ filename, rows, onPrint, headers, className, shareT
         </DropdownItem>
       )}
       <DropdownItem onSelect={triggerPrint}>
-        <Printer className="h-4 w-4" /> Print
-      </DropdownItem>
-      <DropdownItem onSelect={triggerPrint}>
-        <FileText className="h-4 w-4" /> Save as PDF
+        <Printer className="h-4 w-4" /> Print / Save as PDF
       </DropdownItem>
       <DropdownItem onSelect={triggerShare}>
         <Share2 className="h-4 w-4" /> Share link

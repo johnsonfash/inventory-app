@@ -1,5 +1,6 @@
 import * as React from "react"
-import { AlertTriangle, ShieldAlert, Sparkles, Tag } from "lucide-react"
+import { Link } from "react-router-dom"
+import { AlertTriangle, Plus, ShieldAlert, Sparkles, Tag } from "lucide-react"
 import { ReportShell } from "@/components/reports/report-shell"
 import { KpiBand } from "@/components/reports/kpi-band"
 import { DataTable, type Column } from "@/components/reports/data-table"
@@ -83,7 +84,15 @@ export default function AllergensReport() {
         exportFilename={`pallio-allergens-${period}`}
         exportRows={[]}
       >
-        <p className="text-sm text-muted-foreground">No recipes yet.</p>
+        <div className="rounded-2xl border border-dashed border-border bg-card p-6 text-center">
+          <p className="text-sm text-muted-foreground">No recipes for this period.</p>
+          <Link
+            to="/inventory/recipes/new"
+            className="mt-3 inline-flex items-center gap-1 rounded-full bg-brand px-3 py-1.5 text-xs font-semibold text-brand-foreground hover:opacity-95 dark:bg-primary dark:text-primary-foreground"
+          >
+            <Plus className="h-3.5 w-3.5" /> Create a recipe
+          </Link>
+        </div>
       </ReportShell>
     )
   }
