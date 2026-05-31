@@ -158,11 +158,21 @@ export default function CommunicationsHub() {
           <EmptyState
             Icon={Mail}
             title={query ? "No messages match" : `No ${FOLDER_LABEL[folder].toLowerCase()} messages`}
-            description={query ? "Try a different search." : folder === "drafts" ? "Start a new draft — it'll save automatically as you write." : "Quiet for now."}
+            description={
+              query
+                ? "Try a different search."
+                : folder === "drafts"
+                  ? "Start a new draft — it'll save automatically as you write."
+                  : folder === "inbox"
+                    ? "Quiet for now. Start a new thread when you're ready."
+                    : "Nothing sent recently. Compose a new message to get started."
+            }
             action={
-              folder === "drafts" ? (
-                <Link to="/communications/new"><Button><Pencil className="h-4 w-4" /> New email</Button></Link>
-              ) : undefined
+              query ? undefined : (
+                <Link to="/communications/new">
+                  <Button><Pencil className="h-4 w-4" /> {folder === "drafts" ? "New email" : "Compose"}</Button>
+                </Link>
+              )
             }
           />
         ) : (

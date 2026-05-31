@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { ArrowLeft, ArrowRight, Copy, Eye, Lock, Pencil, Plus, Search, Sparkles, Trash2 } from "lucide-react"
+import { ArrowLeft, ArrowRight, Copy, Eye, LayoutTemplate, Lock, Pencil, Plus, Search, Sparkles, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { BottomSheet } from "@/components/mobile/bottom-sheet"
 import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
 import { SummaryStrip } from "@/components/lists/summary-strip"
+import { EmptyState } from "@/components/lists/empty-state"
 import { InfoTooltip } from "@/components/info-tooltip"
 import { interpolate } from "@/lib/comms/data"
 import { loadAllTemplates, deleteUserTemplate, saveUserTemplate, TEMPLATES_CHANGED } from "@/lib/comms/storage"
@@ -134,6 +135,26 @@ export default function TemplatesLibrary() {
         </div>
 
         {/* Template grid */}
+        {filtered.length === 0 ? (
+          <EmptyState
+            Icon={LayoutTemplate}
+            title={query || category !== "all" ? "No templates match" : "No templates yet"}
+            description={
+              query || category !== "all"
+                ? "Try a different search term, switch category, or clear the filters."
+                : "Start with a built-in template or compose a new one from scratch."
+            }
+            action={
+              query || category !== "all" ? (
+                <Button variant="outline" onClick={() => { setQuery(""); setCategory("all") }}>Clear filters</Button>
+              ) : (
+                <Button onClick={() => navigate("/communications/templates/new")}>
+                  <Plus className="h-4 w-4" /> New template
+                </Button>
+              )
+            }
+          />
+        ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((t) => (
             <article key={t.id} className="flex flex-col rounded-2xl border border-border bg-card p-4 transition-colors hover:border-brand/40">
@@ -188,19 +209,30 @@ export default function TemplatesLibrary() {
             </article>
           ))}
         </div>
+        )}
 
         {/* AI helper card */}
         <section className="rounded-2xl border border-dashed border-border bg-gradient-to-br from-brand-soft via-card to-emerald-50/40 p-4 dark:from-primary/10 dark:to-emerald-950/15">
           <div className="flex items-baseline gap-1.5">
             <h3 className="text-sm font-bold tracking-tight">Need a new template?</h3>
+            <span className="inline-flex items-center gap-1 rounded-full border border-brand/30 bg-brand-soft px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-brand dark:border-primary/30 dark:bg-primary/10 dark:text-primary">
+              soon
+            </span>
             <InfoTooltip label="AI templates" size="xs">
               Describe what you want — "an apology when a shipment is delayed" — and Pallio AI drafts a complete template with the right variables. Lands when the AI backend ships.
             </InfoTooltip>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Pallio AI can draft one in a few seconds — just describe the use case.
+            Pallio AI can draft one in a few seconds — just describe the use case. Lands with the AI backend.
           </p>
-          <Button size="sm" className="mt-3" disabled>
+          <Button
+            size="sm"
+            className="mt-3"
+            disabled
+            aria-disabled
+            aria-label="Draft a template with AI — feature unlocks when the Pallio AI backend ships"
+            title="Unlocks when the Pallio AI backend ships"
+          >
             <Sparkles className="h-3.5 w-3.5" /> Draft a template with AI · coming soon
           </Button>
         </section>
@@ -215,13 +247,16 @@ export default function TemplatesLibrary() {
         maxHeightVh={85}
         footer={
           preview ? (
-            <div className="flex items-center justify-between gap-2 pb-3">
-              <Button variant="ghost" onClick={() => { const t = preview; setPreview(null); onEditOrClone(t) }}>
-                {preview.builtin ? <><Copy className="h-3.5 w-3.5" /> Clone</> : <><Pencil className="h-3.5 w-3.5" /> Edit</>}
-              </Button>
-              <Link to={`/communications/new?template=${preview.id}`}>
-                <Button onClick={() => setPreview(null)}>Use template <ArrowRight className="h-3.5 w-3.5" /></Button>
-              </Link>
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3">
+              <Button variant="ghost" onClick={() => setPreview(null)}>Close</Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={() => { const t = preview; setPreview(null); onEditOrClone(t) }}>
+                  {preview.builtin ? <><Copy className="h-3.5 w-3.5" /> Clone</> : <><Pencil className="h-3.5 w-3.5" /> Edit</>}
+                </Button>
+                <Link to={`/communications/new?template=${preview.id}`}>
+                  <Button onClick={() => setPreview(null)}>Use template <ArrowRight className="h-3.5 w-3.5" /></Button>
+                </Link>
+              </div>
             </div>
           ) : null
         }

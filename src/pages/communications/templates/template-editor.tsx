@@ -16,6 +16,7 @@ import {
   saveUserTemplate,
 } from "@/lib/comms/storage"
 import type { EmailTemplate, TemplateCategory } from "@/lib/comms/types"
+import { cn } from "@/lib/utils"
 
 const CATEGORIES: { value: TemplateCategory; label: string }[] = [
   { value: "transactional", label: "Transactional" },
@@ -71,10 +72,24 @@ export function TemplateEditor() {
     return m
   }, [tokens])
 
-  const valid = name.trim().length > 0 && subject.trim().length > 0 && body.trim().length > 0
+  const [showErrors, setShowErrors] = React.useState(false)
+  const nameInvalid = name.trim().length === 0
+  const subjectInvalid = subject.trim().length === 0
+  const bodyInvalid = body.trim().length === 0
+  const valid = !nameInvalid && !subjectInvalid && !bodyInvalid
 
   const save = () => {
-    if (!valid) return
+    if (!valid) {
+      setShowErrors(true)
+      toast.error("Fill in all required fields", {
+        description: [
+          nameInvalid ? "name" : null,
+          subjectInvalid ? "subject" : null,
+          bodyInvalid ? "body" : null,
+        ].filter(Boolean).join(", "),
+      })
+      return
+    }
     saveUserTemplate({
       id: editingId,
       name: name.trim(),
@@ -108,8 +123,23 @@ export function TemplateEditor() {
           {/* Editor */}
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1.5 text-xs">
-              <span className="font-semibold text-foreground/80">Template name</span>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Shipment delayed" />
+              <span className="inline-flex items-center gap-1 font-semibold text-foreground/80">
+                Template name <span className="text-rose-500">*</span>
+              </span>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Shipment delayed"
+                maxLength={100}
+                aria-label="Template name (required, up to 100 characters)"
+                aria-invalid={showErrors && nameInvalid ? true : undefined}
+                className={cn(showErrors && nameInvalid && "border-rose-500 focus-visible:ring-rose-500/20")}
+              />
+              {showErrors && nameInvalid && (
+                <span role="alert" className="text-[11px] font-medium text-rose-600 dark:text-rose-400">
+                  Give your template a short name.
+                </span>
+              )}
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="flex flex-col gap-1.5 text-xs">
@@ -129,18 +159,40 @@ export function TemplateEditor() {
               </label>
             </div>
             <label className="flex flex-col gap-1.5 text-xs">
-              <span className="font-semibold text-foreground/80">Subject</span>
-              <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Your order {{invoice_number}} has shipped" />
+              <span className="inline-flex items-center gap-1 font-semibold text-foreground/80">
+                Subject <span className="text-rose-500">*</span>
+              </span>
+              <Input
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="Your order {{invoice_number}} has shipped"
+                maxLength={200}
+                aria-invalid={showErrors && subjectInvalid ? true : undefined}
+                className={cn(showErrors && subjectInvalid && "border-rose-500 focus-visible:ring-rose-500/20")}
+              />
+              {showErrors && subjectInvalid && (
+                <span role="alert" className="text-[11px] font-medium text-rose-600 dark:text-rose-400">
+                  Subject is required.
+                </span>
+              )}
             </label>
             <label className="flex flex-col gap-1.5 text-xs">
-              <span className="font-semibold text-foreground/80">Body (HTML)</span>
+              <span className="inline-flex items-center gap-1 font-semibold text-foreground/80">
+                Body (HTML) <span className="text-rose-500">*</span>
+              </span>
               <Textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 rows={12}
                 placeholder={"<p>Hi {{customer_first_name}},</p>\n<p>…</p>"}
-                className="font-mono text-xs"
+                className={cn("font-mono text-xs", showErrors && bodyInvalid && "border-rose-500 focus-visible:ring-rose-500/20")}
+                aria-invalid={showErrors && bodyInvalid ? true : undefined}
               />
+              {showErrors && bodyInvalid && (
+                <span role="alert" className="text-[11px] font-medium text-rose-600 dark:text-rose-400">
+                  Body can't be empty.
+                </span>
+              )}
             </label>
 
             {/* Detected variables */}
@@ -187,7 +239,7 @@ export function TemplateEditor() {
           ) : <span />}
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={() => navigate("/communications/templates")}>Cancel</Button>
-            <Button onClick={save} disabled={!valid}>
+            <Button onClick={save}>
               <Save className="h-4 w-4" /> {id ? "Save changes" : "Create template"}
             </Button>
           </div>

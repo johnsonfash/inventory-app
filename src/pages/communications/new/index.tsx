@@ -83,6 +83,7 @@ export default function ComposeEmail() {
   const [submitting, setSubmitting] = React.useState(false)
   const [channel, setChannel] = React.useState<SendChannel>("email")
   const [attachments, setAttachments] = React.useState<Attachment[]>([])
+  const [showErrors, setShowErrors] = React.useState(false)
   const fileRef = React.useRef<HTMLInputElement>(null)
 
   // Templates = builtins + the user's own (W4 editor). Refresh on change.
@@ -93,9 +94,31 @@ export default function ComposeEmail() {
     return () => window.removeEventListener(TEMPLATES_CHANGED, refresh)
   }, [])
 
+  // Most mail providers cap a single attachment at ~25 MB (Mailgun, Gmail).
+  // Validate up-front so users get a clear rejection instead of a silent
+  // accept-then-fail on send.
+  const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
   const onAttach = (files: FileList | null) => {
     if (!files) return
-    setAttachments((prev) => [...prev, ...Array.from(files).map((f) => ({ id: `${f.name}-${Date.now()}`, name: f.name, size: f.size }))])
+    const accepted: Attachment[] = []
+    const rejected: { name: string; reason: string }[] = []
+    for (const f of Array.from(files)) {
+      if (f.size > MAX_ATTACHMENT_BYTES) {
+        rejected.push({ name: f.name, reason: `over 25 MB (${(f.size / (1024 * 1024)).toFixed(1)} MB)` })
+        continue
+      }
+      if (f.size === 0) {
+        rejected.push({ name: f.name, reason: "empty file" })
+        continue
+      }
+      accepted.push({ id: `${f.name}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, name: f.name, size: f.size })
+    }
+    if (rejected.length > 0) {
+      toast.error(`Couldn't attach ${rejected.length} file${rejected.length === 1 ? "" : "s"}`, {
+        description: rejected.map((r) => `${r.name} — ${r.reason}`).join("; "),
+      })
+    }
+    if (accepted.length > 0) setAttachments((prev) => [...prev, ...accepted])
   }
 
   const template = templates.find((t) => t.id === templateId)
@@ -117,7 +140,20 @@ export default function ComposeEmail() {
   const interpolatedSubject = template ? interpolate(subject, variables) : subject
   const interpolatedBody = template ? interpolate(body, variables) : body
 
+  const missingTo = to.length === 0
+  const missingSubject = channel === "email" && !subject.trim()
+  const canSend = !missingTo && !missingSubject
+
   const onSend = async () => {
+    if (!canSend) {
+      setShowErrors(true)
+      if (missingTo) {
+        toast.error("Add at least one recipient before sending.")
+      } else if (missingSubject) {
+        toast.error("Email subject is required.")
+      }
+      return
+    }
     setSubmitting(true)
     await new Promise((r) => setTimeout(r, 600))
     setSubmitting(false)
@@ -183,8 +219,8 @@ export default function ComposeEmail() {
             </Field>
 
             {/* To */}
-            <Field label="To" required>
-              <RecipientPicker selected={to} onChange={setTo} />
+            <Field label="To" required error={showErrors && missingTo ? "Add at least one recipient." : undefined}>
+              <RecipientPicker selected={to} onChange={setTo} invalid={showErrors && missingTo} />
             </Field>
 
             {!showCc ? (
@@ -203,12 +239,15 @@ export default function ComposeEmail() {
 
             {/* Subject — email only; SMS/WhatsApp have no subject line */}
             {channel === "email" && (
-              <Field label="Subject" required>
+              <Field label="Subject" required error={showErrors && missingSubject ? "Subject is required for email." : undefined}>
                 <Input
                   value={preview ? interpolatedSubject : subject}
                   readOnly={preview}
                   onChange={(e) => setSubject(e.target.value)}
                   placeholder="Quick subject…"
+                  aria-invalid={showErrors && missingSubject ? true : undefined}
+                  aria-describedby={showErrors && missingSubject ? "compose-subject-error" : undefined}
+                  className={cn(showErrors && missingSubject && "border-rose-500 focus-visible:ring-rose-500/20")}
                 />
               </Field>
             )}
@@ -265,7 +304,7 @@ export default function ComposeEmail() {
                 <Button variant="ghost" size="sm" onClick={onSaveDraft} disabled={submitting}>
                   <Save className="h-3.5 w-3.5" /> Save draft
                 </Button>
-                <Button size="sm" onClick={onSend} disabled={submitting || to.length === 0 || (channel === "email" && !subject.trim())}>
+                <Button size="sm" onClick={onSend} disabled={submitting}>
                   {submitting ? "Sending…" : <>Send {channel === "email" ? "" : channelLabel} <Send className="h-3.5 w-3.5" /></>}
                 </Button>
               </div>
@@ -334,14 +373,25 @@ export default function ComposeEmail() {
             <div className="rounded-2xl border border-dashed border-border bg-gradient-to-br from-brand-soft via-card to-emerald-50/40 p-4 dark:from-primary/10 dark:to-emerald-950/15">
               <div className="flex items-baseline gap-1.5">
                 <h3 className="text-sm font-semibold">Need help writing?</h3>
+                <span className="inline-flex items-center gap-1 rounded-full border border-brand/30 bg-brand-soft px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-brand dark:border-primary/30 dark:bg-primary/10 dark:text-primary">
+                  soon
+                </span>
                 <InfoTooltip label="AI draft" size="xs">
                   Coming soon — drop a prompt and Pallio AI drafts a starting point you can edit. Hooked up to the same backend that powers the Dashboard AI Insights.
                 </InfoTooltip>
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                Pallio AI can draft from a one-line brief.
+                Pallio AI can draft from a one-line brief. Lands with the AI backend.
               </p>
-              <Button variant="outline" size="sm" className="mt-3 w-full" disabled>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3 w-full"
+                disabled
+                aria-disabled
+                aria-label="Draft with AI — feature unlocks when the Pallio AI backend ships"
+                title="Unlocks when the Pallio AI backend ships"
+              >
                 <Sparkles className="h-3.5 w-3.5" /> Draft with AI · coming soon
               </Button>
             </div>
@@ -352,7 +402,7 @@ export default function ComposeEmail() {
   )
 }
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({ label, required, error, children }: { label: string; required?: boolean; error?: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5 text-xs">
       <span className="inline-flex items-center gap-1 font-semibold text-foreground/80">
@@ -360,6 +410,11 @@ function Field({ label, required, children }: { label: string; required?: boolea
         {required && <span className="text-rose-500">*</span>}
       </span>
       {children}
+      {error && (
+        <span id="compose-subject-error" role="alert" className="text-[11px] font-medium text-rose-600 dark:text-rose-400">
+          {error}
+        </span>
+      )}
     </label>
   )
 }
@@ -367,9 +422,11 @@ function Field({ label, required, children }: { label: string; required?: boolea
 function RecipientPicker({
   selected,
   onChange,
+  invalid,
 }: {
   selected: Recipient[]
   onChange: (next: Recipient[]) => void
+  invalid?: boolean
 }) {
   const [query, setQuery] = React.useState("")
   const [focused, setFocused] = React.useState(false)
@@ -396,6 +453,7 @@ function RecipientPicker({
         className={cn(
           "flex flex-wrap items-center gap-1.5 rounded-md border border-input bg-background p-1.5 transition-colors",
           focused && "border-brand/60 ring-2 ring-brand/20 dark:border-primary/60 dark:ring-primary/20",
+          invalid && !focused && "border-rose-500",
         )}
         onClick={() => setFocused(true)}
       >
