@@ -243,9 +243,9 @@ function Footer() {
               All-in-one inventory, POS, sales team, marketing and books. Built mobile-first for the operators who actually run the floor.
             </p>
             <div className="mt-5 flex items-center gap-2">
-              <SocialLink href="https://twitter.com" label="Twitter"><Twitter className="h-4 w-4" /></SocialLink>
-              <SocialLink href="https://instagram.com" label="Instagram"><Instagram className="h-4 w-4" /></SocialLink>
-              <SocialLink href="https://linkedin.com" label="LinkedIn"><Linkedin className="h-4 w-4" /></SocialLink>
+              <SocialLink href="https://twitter.com/pallioapp" label="Twitter"><Twitter className="h-4 w-4" /></SocialLink>
+              <SocialLink href="https://instagram.com/pallioapp" label="Instagram"><Instagram className="h-4 w-4" /></SocialLink>
+              <SocialLink href="https://linkedin.com/company/pallio" label="LinkedIn"><Linkedin className="h-4 w-4" /></SocialLink>
               <SocialLink href="https://github.com/johnsonfash/inventory-app" label="GitHub"><Github className="h-4 w-4" /></SocialLink>
             </div>
           </div>
@@ -254,7 +254,7 @@ function Footer() {
             { to: "/pricing", label: "Pricing" },
             { to: "/dashboard", label: "Open the app" },
             { to: "/faq", label: "FAQ" },
-            { to: "/about", label: "Roadmap" },
+            { to: "/about#story", label: "Our story" },
           ]} />
           <Col title="Company" links={[
             { to: "/about", label: "About" },

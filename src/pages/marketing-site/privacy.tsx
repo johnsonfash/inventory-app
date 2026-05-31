@@ -13,7 +13,7 @@ export default function PrivacyPage() {
             Legal
           </p>
           <h1 className="mt-2 text-4xl font-extrabold tracking-tight md:text-5xl">Privacy Policy</h1>
-          <p className="mt-3 text-sm text-muted-foreground">Last updated: {new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}</p>
+          <p className="mt-3 text-sm text-muted-foreground">Last updated: May 23, 2026</p>
         </header>
 
         <section>
@@ -52,7 +52,7 @@ export default function PrivacyPage() {
           <p>We do <strong>not</strong> sell your data to third parties. We do not use your business data to train any AI / ML model.</p>
         </section>
 
-        <section>
+        <section id="sub-processors">
           <h2>Sub-processors</h2>
           <p>
             We use a small number of well-known service providers to operate Pallio. Each is bound by a contract that holds them to at least the same level of care described here:
