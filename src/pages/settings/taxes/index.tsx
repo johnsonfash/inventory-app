@@ -1,9 +1,11 @@
 import * as React from "react"
 import { Edit3, Plus, Search, Tags, Trash2 } from "lucide-react"
+import { toast } from "sonner"
 import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import { EmptyState } from "@/components/lists/empty-state"
@@ -44,6 +46,8 @@ export default function TaxRates() {
 
   const [rows, setRows] = React.useState<Row[]>(SEED_TAX_RATES)
   const [addOpen, setAddOpen] = React.useState(false)
+  const [editRow, setEditRow] = React.useState<Row | null>(null)
+  const [deleteRow, setDeleteRow] = React.useState<Row | null>(null)
 
   const handleCreate = (r: QuickTaxRate) => {
     setRows((prev) => {
@@ -51,6 +55,22 @@ export default function TaxRates() {
       const base = r.default ? prev.map((x) => ({ ...x, default: false })) : prev
       return [{ id: `TX-${Math.floor(100 + Math.random() * 900)}`, ...r, active: true }, ...base]
     })
+  }
+
+  const handleEdit = (r: QuickTaxRate) => {
+    if (!editRow) return
+    setRows((prev) => {
+      const base = r.default ? prev.map((x) => ({ ...x, default: false })) : prev
+      return base.map((x) => (x.id === editRow.id ? { ...x, ...r } : x))
+    })
+    setEditRow(null)
+  }
+
+  const confirmDelete = () => {
+    if (!deleteRow) return
+    setRows((prev) => prev.filter((x) => x.id !== deleteRow.id))
+    toast.success("Tax rate removed", { description: deleteRow.name })
+    setDeleteRow(null)
   }
 
   useRegisterPageRefresh(React.useCallback(async () => { await new Promise((r) => setTimeout(r, 400)) }, []))
@@ -197,8 +217,8 @@ export default function TaxRates() {
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       <div className="inline-flex items-center gap-1">
-                        <Button size="sm" variant="ghost" aria-label="Edit"><Edit3 className="h-3.5 w-3.5" aria-hidden="true" /></Button>
-                        <Button size="sm" variant="ghost" aria-label="Delete"><Trash2 className="h-3.5 w-3.5" aria-hidden="true" /></Button>
+                        <Button size="sm" variant="ghost" aria-label="Edit" onClick={() => setEditRow(r)}><Edit3 className="h-3.5 w-3.5" aria-hidden="true" /></Button>
+                        <Button size="sm" variant="ghost" aria-label="Delete" onClick={() => setDeleteRow(r)}><Trash2 className="h-3.5 w-3.5" aria-hidden="true" /></Button>
                       </div>
                     </td>
                   </tr>
@@ -210,6 +230,34 @@ export default function TaxRates() {
       </div>
 
       <AddTaxRateDialog open={addOpen} onClose={() => setAddOpen(false)} onCreate={handleCreate} />
+      <AddTaxRateDialog
+        open={editRow !== null}
+        onClose={() => setEditRow(null)}
+        onCreate={handleEdit}
+        mode="edit"
+        initial={editRow ? {
+          name: editRow.name,
+          rate: editRow.rate,
+          scope: editRow.scope,
+          appliesTo: editRow.appliesTo,
+          default: editRow.default,
+        } : undefined}
+      />
+
+      <Dialog open={deleteRow !== null} onOpenChange={(v) => !v && setDeleteRow(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete tax rate?</DialogTitle>
+            <DialogDescription>
+              {deleteRow ? <>This removes <strong>{deleteRow.name}</strong> ({deleteRow.rate}%). Historical records keep their original rate.</> : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteRow(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   )
 }

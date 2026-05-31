@@ -1,10 +1,8 @@
 import * as React from "react"
 import { Link } from "react-router-dom"
-import { toast } from "sonner"
 import {
   Bot,
   Crown,
-  Edit3,
   Eye,
   Megaphone,
   Plus,
@@ -206,14 +204,13 @@ export default function RolesSettings() {
                       {ROLE_DEFS.find((x) => x.key === r)?.name.split(" ")[0]}
                     </th>
                   ))}
-                  <th className="px-3 py-2.5 text-right font-medium" />
                 </tr>
               </thead>
               <tbody>
                 {Object.entries(grouped).map(([group, perms], gi) => (
                   <React.Fragment key={group}>
                     <tr>
-                      <td colSpan={ROLES_TO_SHOW.length + 2} className={cn(
+                      <td colSpan={ROLES_TO_SHOW.length + 1} className={cn(
                         "bg-background/40 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground",
                         gi > 0 && "border-t border-border",
                       )}>{group}</td>
@@ -237,9 +234,6 @@ export default function RolesSettings() {
                             )}
                           </td>
                         ))}
-                        <td className="px-3 py-2.5 text-right">
-                          <Button size="sm" variant="ghost" aria-label="Edit permission" onClick={() => toast("Edit permission", { description: p.key })}><Edit3 className="h-3.5 w-3.5" aria-hidden="true" /></Button>
-                        </td>
                       </tr>
                     ))}
                   </React.Fragment>
@@ -285,5 +279,5 @@ export default function RolesSettings() {
 
 // keep unused-import warnings off for icons we may surface in
 // custom-role editing later.
-const _used = { Bot, Store, Users, Edit3 }
+const _used = { Bot, Store, Users }
 void _used

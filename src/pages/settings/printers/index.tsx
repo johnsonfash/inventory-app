@@ -1,9 +1,11 @@
 import * as React from "react"
-import { Plus, Printer, Search, Wifi, WifiOff } from "lucide-react"
+import { toast } from "sonner"
+import { CheckCircle2, Plus, Printer, Search, Trash2, Wifi, WifiOff } from "lucide-react"
 import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import { EmptyState } from "@/components/lists/empty-state"
 import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
@@ -45,7 +47,25 @@ export default function Printers() {
   const [query, setQuery] = React.useState("")
   const [rows, setRows] = React.useState<Row[]>(SEED_PRINTERS)
   const [addOpen, setAddOpen] = React.useState(false)
+  const [detailId, setDetailId] = React.useState<string | null>(null)
   useRegisterPageRefresh(React.useCallback(async () => { await new Promise((r) => setTimeout(r, 400)) }, []))
+
+  const detail = detailId ? rows.find((r) => r.id === detailId) ?? null : null
+
+  const handleTestPrint = (r: Row) => {
+    toast.success("Test print sent", { description: `${r.name} · ${r.model}` })
+  }
+  const handleSetDefault = (r: Row) => {
+    // Default is per-type — only one receipt printer can be the default at a
+    // time, but a label printer can also be default at the same time.
+    setRows((prev) => prev.map((x) => x.type === r.type ? { ...x, isDefault: x.id === r.id } : x))
+    toast.success("Default printer updated", { description: `${r.name} is now the default ${r.type} printer` })
+  }
+  const handleRemove = (r: Row) => {
+    setRows((prev) => prev.filter((x) => x.id !== r.id))
+    toast.success("Printer removed", { description: r.name })
+    setDetailId(null)
+  }
 
   const handleCreate = (p: QuickPrinter) => {
     setRows((prev) => [
@@ -110,31 +130,38 @@ export default function Printers() {
         ) : (
           <ul className="space-y-2">
             {filtered.map((r) => (
-              <li key={r.id} className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand dark:bg-primary/15 dark:text-primary">
-                  <Printer className="h-4 w-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-sm font-semibold">
-                      {r.name}
-                      {r.isDefault && <StatusBadge tone="success" className="ml-2">default</StatusBadge>}
+              <li key={r.id}>
+                <button
+                  type="button"
+                  onClick={() => setDetailId(r.id)}
+                  className="flex w-full items-start gap-3 rounded-2xl border border-border bg-card p-3 text-left transition-colors hover:border-brand/40 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                  aria-label={`Open ${r.name} details`}
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand dark:bg-primary/15 dark:text-primary">
+                    <Printer className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-semibold">
+                        {r.name}
+                        {r.isDefault && <StatusBadge tone="success" className="ml-2">default</StatusBadge>}
+                      </p>
+                      <StatusBadge tone={statusTone[r.status]} withDot>
+                        {r.status}
+                      </StatusBadge>
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      {r.model} · {r.location}
                     </p>
-                    <StatusBadge tone={statusTone[r.status]} withDot>
-                      {r.status}
-                    </StatusBadge>
+                    <div className="mt-1.5 flex items-center gap-1.5">
+                      <StatusBadge tone={typeTone[r.type]}>{r.type}</StatusBadge>
+                      <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                        {r.status === "offline" ? <WifiOff className="h-3 w-3" /> : <Wifi className="h-3 w-3" />}
+                        {r.connection}
+                      </span>
+                    </div>
                   </div>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    {r.model} · {r.location}
-                  </p>
-                  <div className="mt-1.5 flex items-center gap-1.5">
-                    <StatusBadge tone={typeTone[r.type]}>{r.type}</StatusBadge>
-                    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                      {r.status === "offline" ? <WifiOff className="h-3 w-3" /> : <Wifi className="h-3 w-3" />}
-                      {r.connection}
-                    </span>
-                  </div>
-                </div>
+                </button>
               </li>
             ))}
           </ul>
@@ -143,6 +170,68 @@ export default function Printers() {
 
       <MobileFab onClick={() => setAddOpen(true)} label="Add printer" />
       <AddPrinterDialog open={addOpen} onClose={() => setAddOpen(false)} onCreate={handleCreate} />
+
+      <Dialog open={detail !== null} onOpenChange={(v) => !v && setDetailId(null)}>
+        <DialogContent>
+          {detail && (
+            <>
+              <DialogHeader>
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand dark:bg-primary/15 dark:text-primary">
+                    <Printer className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <DialogTitle>{detail.name}</DialogTitle>
+                    <DialogDescription>
+                      {detail.model} · {detail.location}
+                    </DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-border bg-background p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Status</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <StatusBadge tone={statusTone[detail.status]} withDot>{detail.status}</StatusBadge>
+                    {detail.isDefault && <StatusBadge tone="success">default</StatusBadge>}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border bg-background p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Type · Connection</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <StatusBadge tone={typeTone[detail.type]}>{detail.type}</StatusBadge>
+                    <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                      {detail.status === "offline" ? <WifiOff className="h-3 w-3" /> : <Wifi className="h-3 w-3" />}
+                      {detail.connection}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="flex-wrap">
+                <Button variant="outline" size="sm" onClick={() => handleTestPrint(detail)}>
+                  <Printer className="h-3.5 w-3.5" /> Test print
+                </Button>
+                {!detail.isDefault && (
+                  <Button variant="outline" size="sm" onClick={() => handleSetDefault(detail)}>
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Make default
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-rose-500/40 text-rose-600 dark:text-rose-400"
+                  onClick={() => handleRemove(detail)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Remove
+                </Button>
+                <Button size="sm" onClick={() => setDetailId(null)}>Done</Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </PageShell>
   )
 }

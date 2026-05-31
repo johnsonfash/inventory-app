@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Link, useParams } from "react-router-dom"
+import { Link, useNavigate, useParams } from "react-router-dom"
 import { toast } from "sonner"
 import {
   Activity,
@@ -27,6 +27,7 @@ import {
 import { PageShell } from "@/components/page-shell"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
 import { SummaryStrip } from "@/components/lists/summary-strip"
 import { InfoTooltip } from "@/components/info-tooltip"
@@ -100,10 +101,24 @@ const ACTIVITY_BY_MEMBER: Record<string, { text: string; minutesAgo: number; kin
 
 export default function MemberDetail() {
   const params = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const id = params.id ?? ""
   const member = getMemberById(id)
   const { formatPrice } = useCurrency()
   useRegisterPageRefresh(React.useCallback(async () => { await new Promise((r) => setTimeout(r, 300)) }, []))
+
+  // Local UI state for the action-button confirm dialogs. Member mutations
+  // are mock-only until the backend lands — `localStatus` lets the suspend /
+  // reinstate flow visibly toggle without backend persistence.
+  const [editOpen, setEditOpen] = React.useState(false)
+  const [resetOpen, setResetOpen] = React.useState(false)
+  const [suspendOpen, setSuspendOpen] = React.useState(false)
+  const [removeOpen, setRemoveOpen] = React.useState(false)
+  const [revokeSessionId, setRevokeSessionId] = React.useState<string | null>(null)
+  const [revokedSessionIds, setRevokedSessionIds] = React.useState<Set<string>>(() => new Set())
+  const [localStatus, setLocalStatus] = React.useState<import("@/lib/team/types").MemberStatus | null>(null)
+  const [editName, setEditName] = React.useState("")
+  const [editEmail, setEditEmail] = React.useState("")
 
   if (!member) {
     return (
@@ -127,6 +142,7 @@ export default function MemberDetail() {
   const sessions = sessionsForMember(member.id)
   const activity = ACTIVITY_BY_MEMBER[member.id] ?? []
   const isAffiliate = member.role === "affiliate"
+  const effectiveStatus = localStatus ?? member.status
 
   const copyAffiliateLink = async () => {
     if (!member.affiliateCode) return
@@ -137,6 +153,43 @@ export default function MemberDetail() {
     } catch {
       toast.error("Couldn't copy")
     }
+  }
+
+  const firstName = member.name.split(" ")[0]
+  const confirmReset = () => {
+    toast.success("Password reset link sent", { description: `Emailed to ${member.email}` })
+    setResetOpen(false)
+  }
+  const confirmSuspend = () => {
+    const next = effectiveStatus === "suspended" ? "active" : "suspended"
+    setLocalStatus(next)
+    toast.success(next === "suspended" ? `${firstName} suspended` : `${firstName} reinstated`)
+    setSuspendOpen(false)
+  }
+  const confirmRemove = () => {
+    toast.success(`${firstName} removed from team`)
+    setRemoveOpen(false)
+    navigate("/settings/users")
+  }
+  const confirmRevoke = () => {
+    if (!revokeSessionId) return
+    setRevokedSessionIds((prev) => {
+      const next = new Set(prev)
+      next.add(revokeSessionId)
+      return next
+    })
+    toast.success("Session revoked")
+    setRevokeSessionId(null)
+  }
+  const openEdit = () => {
+    setEditName(member.name)
+    setEditEmail(member.email)
+    setEditOpen(true)
+  }
+  const confirmEdit = () => {
+    if (!editName.trim()) return
+    toast.success("Member updated", { description: editName.trim() })
+    setEditOpen(false)
   }
 
   return (
@@ -168,7 +221,7 @@ export default function MemberDetail() {
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-xl font-bold tracking-tight md:text-2xl">{member.name}</h2>
                 <StatusBadge tone={ROLE_TONE[member.role]}>{role.name}</StatusBadge>
-                {member.status === "suspended" && (
+                {effectiveStatus === "suspended" && (
                   <StatusBadge tone="danger" withDot>suspended</StatusBadge>
                 )}
                 {isAffiliate && (
@@ -204,7 +257,7 @@ export default function MemberDetail() {
                   <MessageSquare className="h-3.5 w-3.5" /> Message
                 </Button>
               </Link>
-              <Button size="sm">
+              <Button size="sm" onClick={openEdit}>
                 <Edit3 className="h-3.5 w-3.5" /> Edit
               </Button>
             </div>
@@ -225,7 +278,7 @@ export default function MemberDetail() {
                   { label: "MTD sales",       value: formatPrice(member.mtdSalesUsd ?? 0), tone: "brand",   hint: "this month" },
                   { label: "Commission",      value: formatPrice(member.mtdCommissionUsd ?? 0), tone: "success", hint: "at current rate" },
                   { label: "Sessions",        value: String(sessions.length), tone: "info", hint: "active devices" },
-                  { label: "Status",          value: member.status, tone: member.status === "active" ? "success" : "danger", hint: "" },
+                  { label: "Status",          value: effectiveStatus, tone: effectiveStatus === "active" ? "success" : "danger", hint: "" },
                 ]
           }
         />
@@ -327,8 +380,15 @@ export default function MemberDetail() {
                     </div>
                     {s.current ? (
                       <StatusBadge tone="success" withDot>this device</StatusBadge>
+                    ) : revokedSessionIds.has(s.id) ? (
+                      <StatusBadge tone="neutral">revoked</StatusBadge>
                     ) : (
-                      <Button size="sm" variant="ghost" className="text-rose-600 dark:text-rose-400">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-rose-600 dark:text-rose-400"
+                        onClick={() => setRevokeSessionId(s.id)}
+                      >
                         Revoke
                       </Button>
                     )}
@@ -346,17 +406,17 @@ export default function MemberDetail() {
             Use these with care — both immediately revoke {member.name.split(" ")[0]}'s ability to use Pallio.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button size="sm" variant="outline">
+            <Button size="sm" variant="outline" onClick={() => setResetOpen(true)}>
               <Sparkles className="h-3.5 w-3.5" /> Reset password
             </Button>
-            <Button size="sm" variant="outline">
-              {member.status === "suspended" ? (
+            <Button size="sm" variant="outline" onClick={() => setSuspendOpen(true)}>
+              {effectiveStatus === "suspended" ? (
                 <><CheckCircle2 className="h-3.5 w-3.5" /> Reinstate</>
               ) : (
                 <><Award className="h-3.5 w-3.5" /> Suspend</>
               )}
             </Button>
-            <Button size="sm" variant="outline" className="border-rose-500/40 text-rose-600 dark:text-rose-400">
+            <Button size="sm" variant="outline" className="border-rose-500/40 text-rose-600 dark:text-rose-400" onClick={() => setRemoveOpen(true)}>
               <Trash2 className="h-3.5 w-3.5" /> Remove from team
             </Button>
           </div>
@@ -368,6 +428,114 @@ export default function MemberDetail() {
           Full audit log + permission change history land with the real backend.
         </p>
       </div>
+
+      {/* Edit member */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit member</DialogTitle>
+            <DialogDescription>
+              Update {firstName}'s name or email. To change their role, use the role picker on the access section.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <label className="flex flex-col gap-1.5 text-xs">
+              <span className="font-semibold text-foreground/80">Name</span>
+              <input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="rounded-md border border-input bg-transparent px-3 py-1.5 text-sm outline-none focus:border-brand"
+              />
+            </label>
+            <label className="flex flex-col gap-1.5 text-xs">
+              <span className="font-semibold text-foreground/80">Email</span>
+              <input
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                className="rounded-md border border-input bg-transparent px-3 py-1.5 text-sm outline-none focus:border-brand"
+              />
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button onClick={confirmEdit} disabled={!editName.trim()}>Save changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset password */}
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send password reset link?</DialogTitle>
+            <DialogDescription>
+              {firstName} will receive an email at <strong>{member.email}</strong> with a link to set a new password. Active sessions stay signed in until they sign out.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setResetOpen(false)}>Cancel</Button>
+            <Button onClick={confirmReset}>Send reset link</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Suspend / reinstate */}
+      <Dialog open={suspendOpen} onOpenChange={setSuspendOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {effectiveStatus === "suspended" ? `Reinstate ${firstName}?` : `Suspend ${firstName}?`}
+            </DialogTitle>
+            <DialogDescription>
+              {effectiveStatus === "suspended"
+                ? `${firstName} will regain access to Pallio immediately.`
+                : `${firstName} will be signed out of every device and blocked from signing in until reinstated.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setSuspendOpen(false)}>Cancel</Button>
+            <Button
+              variant={effectiveStatus === "suspended" ? "default" : "destructive"}
+              onClick={confirmSuspend}
+            >
+              {effectiveStatus === "suspended" ? "Reinstate" : "Suspend"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove from team */}
+      <Dialog open={removeOpen} onOpenChange={setRemoveOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove {firstName} from the team?</DialogTitle>
+            <DialogDescription>
+              This permanently revokes {firstName}'s access. Past sales, invoices, and audit entries are preserved under their name.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRemoveOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmRemove}>Remove</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Revoke session */}
+      <Dialog open={revokeSessionId !== null} onOpenChange={(v) => !v && setRevokeSessionId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Revoke this session?</DialogTitle>
+            <DialogDescription>
+              The device will be signed out immediately. {firstName} can sign back in with their credentials.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRevokeSessionId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmRevoke}>Revoke</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   )
 }

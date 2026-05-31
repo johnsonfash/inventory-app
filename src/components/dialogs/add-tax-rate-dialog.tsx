@@ -22,15 +22,20 @@ const SCOPE_HINT: Record<QuickTaxRate["scope"], string> = {
 
 // Add a tax rate. There's no full-page form for this — the overlay is the
 // whole create flow — so no "More details" link. Centred modal on desktop,
-// bottom drawer on mobile.
+// bottom drawer on mobile. Pass `initial` to use the same overlay as an
+// edit form — the surface stays identical so the user doesn't context-switch.
 export function AddTaxRateDialog({
   open,
   onClose,
   onCreate,
+  initial,
+  mode = "add",
 }: {
   open: boolean
   onClose: () => void
   onCreate: (r: QuickTaxRate) => void
+  initial?: QuickTaxRate
+  mode?: "add" | "edit"
 }) {
   const [name, setName] = React.useState("")
   const [rate, setRate] = React.useState("")
@@ -43,12 +48,12 @@ export function AddTaxRateDialog({
 
   React.useEffect(() => {
     if (!open) return
-    setName("")
-    setRate("")
-    setScope("global")
-    setAppliesTo("")
-    setIsDefault(false)
-  }, [open])
+    setName(initial?.name ?? "")
+    setRate(initial ? String(initial.rate) : "")
+    setScope(initial?.scope ?? "global")
+    setAppliesTo(initial?.appliesTo ?? "")
+    setIsDefault(initial?.default ?? false)
+  }, [open, initial])
 
   const submit = () => {
     if (!valid) return
@@ -59,7 +64,7 @@ export function AddTaxRateDialog({
       appliesTo: appliesTo.trim() || SCOPE_HINT[scope].replace(/^e\.g\. /, ""),
       default: isDefault,
     })
-    toast.success("Tax rate added", { description: `${name.trim()} · ${numericRate}%` })
+    toast.success(mode === "edit" ? "Tax rate updated" : "Tax rate added", { description: `${name.trim()} · ${numericRate}%` })
     onClose()
   }
 
@@ -67,13 +72,13 @@ export function AddTaxRateDialog({
     <BottomSheet
       open={open}
       onClose={onClose}
-      title="Add tax rate"
+      title={mode === "edit" ? "Edit tax rate" : "Add tax rate"}
       description="VAT / GST / sales-tax rule applied at checkout, on invoices, and in reports."
       maxHeightVh={84}
       footer={
         <div className="flex items-center justify-end gap-2 pb-3">
           <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="button" onClick={submit} disabled={!valid}>Add rate</Button>
+          <Button type="button" onClick={submit} disabled={!valid}>{mode === "edit" ? "Save changes" : "Add rate"}</Button>
         </div>
       }
     >
