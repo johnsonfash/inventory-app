@@ -140,7 +140,14 @@ export default function TaxRates() {
 
         {filtered.length === 0 ? (
           <Card><CardContent className="p-0">
-            <EmptyState Icon={Tags} title="No rates match" description="Add a rate to start applying it to items or regions." />
+            <EmptyState
+              Icon={Tags}
+              title={rows.length === 0 ? "No tax rates yet" : "No rates match"}
+              description={rows.length === 0
+                ? "Add your first tax rate to start applying it to items or regions."
+                : "Try a different search, or add a new rate."}
+              action={<Button onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> Add rate</Button>}
+            />
           </CardContent></Card>
         ) : isMobile ? (
           <ul className="space-y-2">

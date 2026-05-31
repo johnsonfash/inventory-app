@@ -1,4 +1,5 @@
 import * as React from "react"
+import { toast } from "sonner"
 import { Printer, Ruler, ScanLine, Sparkles } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -27,9 +28,16 @@ export default function Barcodes() {
         </>
       }
       backHref="/settings"
-      onSubmit={() => {
+      onSubmit={async () => {
         setSubmitting(true)
-        setTimeout(() => setSubmitting(false), 500)
+        try {
+          await new Promise((r) => setTimeout(r, 500))
+          toast.success("Barcode settings saved.")
+        } catch {
+          toast.error("Couldn't save barcode settings — try again.")
+        } finally {
+          setSubmitting(false)
+        }
       }}
       aside={
         <FormAside

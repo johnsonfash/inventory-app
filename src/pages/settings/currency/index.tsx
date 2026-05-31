@@ -30,7 +30,10 @@ export default function CurrencySettings() {
       await setCurrency(selected)
       toast.success(`Now showing prices in ${selected}.`)
     } catch {
-      toast.error("Couldn't save — try again.")
+      // Longer duration so the error sticks around if the user
+      // navigates away immediately — currency save errors are rare
+      // enough that we shouldn't let them slip past unnoticed.
+      toast.error("Couldn't save currency — try again.", { duration: 8000 })
     } finally {
       setSaving(false)
     }

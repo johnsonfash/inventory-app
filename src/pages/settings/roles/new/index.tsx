@@ -1,4 +1,6 @@
 import * as React from "react"
+import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import { ShieldCheck, Sparkles } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -73,6 +75,7 @@ const PRESETS = {
 }
 
 export default function NewRole() {
+  const navigate = useNavigate()
   const [permissions, setPermissions] = React.useState<Record<string, boolean>>(PRESETS.blank)
   const [submitting, setSubmitting] = React.useState(false)
 
@@ -92,7 +95,18 @@ export default function NewRole() {
         </>
       }
       backHref="/settings/roles"
-      onSubmit={() => { setSubmitting(true); setTimeout(() => setSubmitting(false), 500) }}
+      onSubmit={async () => {
+        setSubmitting(true)
+        try {
+          await new Promise((r) => setTimeout(r, 500))
+          toast.success("Role saved.")
+          navigate("/settings/roles")
+        } catch {
+          toast.error("Couldn't save role — try again.")
+        } finally {
+          setSubmitting(false)
+        }
+      }}
       aside={
         <FormAside
           tips={[

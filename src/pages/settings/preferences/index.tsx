@@ -1,4 +1,5 @@
 import * as React from "react"
+import { toast } from "sonner"
 import { Bell, Calendar, Languages, Palette, Smartphone } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { FormShell } from "@/components/forms/form-shell"
@@ -27,9 +28,16 @@ export default function Preferences() {
         </>
       }
       backHref="/settings"
-      onSubmit={() => {
+      onSubmit={async () => {
         setSubmitting(true)
-        setTimeout(() => setSubmitting(false), 400)
+        try {
+          await new Promise((r) => setTimeout(r, 400))
+          toast.success("Preferences saved.")
+        } catch {
+          toast.error("Couldn't save preferences — try again.")
+        } finally {
+          setSubmitting(false)
+        }
       }}
       aside={
         <FormAside

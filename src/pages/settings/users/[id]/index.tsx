@@ -609,7 +609,30 @@ function CommissionSettings({ member, isAffiliate }: { member: CommissionMember;
             What {member.name.split(" ")[0]} earns per attributable sale. Changes apply to <strong>future</strong> orders only — past commissions stay at their original rate.
           </p>
         </div>
-        <Button size="sm" onClick={() => toast.success(`${member.name.split(" ")[0]}'s commission settings saved.`)}>
+        <Button
+          size="sm"
+          onClick={() => {
+            if (baseRate < 0) {
+              toast.error("Base rate can't be negative.")
+              return
+            }
+            const blankOverride = overrides.find((o) => !o.category.trim())
+            if (blankOverride) {
+              toast.error("Pick a category for every override row, or remove the empty ones.")
+              return
+            }
+            const negativeOverride = overrides.find((o) => o.rate < 0)
+            if (negativeOverride) {
+              toast.error(`Override for ${negativeOverride.category} can't be negative.`)
+              return
+            }
+            if (bonusPool < 0) {
+              toast.error("Bonus pool can't be negative.")
+              return
+            }
+            toast.success(`${member.name.split(" ")[0]}'s commission settings saved.`)
+          }}
+        >
           <Check className="h-3.5 w-3.5" /> Save
         </Button>
       </div>

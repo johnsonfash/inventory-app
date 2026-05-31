@@ -79,9 +79,10 @@ export default function ProfilePage() {
               />
               <button
                 type="button"
-                onClick={() => toast("Photo upload arrives with backend.")}
+                disabled
                 aria-label="Change photo"
-                className="absolute -bottom-1 -right-1 inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background text-foreground shadow-md transition-colors hover:bg-accent"
+                title="Photo upload arrives with the backend."
+                className="absolute -bottom-1 -right-1 inline-flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full border border-border bg-background text-muted-foreground opacity-60 shadow-md"
               >
                 <Camera className="h-4 w-4" />
               </button>

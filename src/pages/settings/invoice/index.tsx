@@ -1,4 +1,5 @@
 import * as React from "react"
+import { toast } from "sonner"
 import { FileText, Hash, Image as ImageIcon, Languages, MailCheck } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -27,9 +28,16 @@ export default function InvoiceSettings() {
         </>
       }
       backHref="/settings"
-      onSubmit={() => {
+      onSubmit={async () => {
         setSubmitting(true)
-        setTimeout(() => setSubmitting(false), 500)
+        try {
+          await new Promise((r) => setTimeout(r, 500))
+          toast.success("Invoice settings saved.")
+        } catch {
+          toast.error("Couldn't save invoice settings — try again.")
+        } finally {
+          setSubmitting(false)
+        }
       }}
       aside={
         <FormAside
@@ -61,8 +69,14 @@ export default function InvoiceSettings() {
               </SelectContent>
             </Select>
           </FormField>
-          <FormField label="Format preview" span={3}>
-            <div className="rounded-lg border border-input bg-muted/30 px-3 py-2 font-mono text-sm tabular-nums">INV-3308</div>
+          <FormField label="Format preview" span={3} hint="Read-only — shows how your next invoice number will look.">
+            <div
+              role="status"
+              aria-live="polite"
+              className="rounded-lg border border-input bg-muted/30 px-3 py-2 font-mono text-sm tabular-nums text-muted-foreground"
+            >
+              INV-3308
+            </div>
           </FormField>
         </FormGrid>
       </FormSection>

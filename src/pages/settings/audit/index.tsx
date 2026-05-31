@@ -67,7 +67,21 @@ export default function AuditLogSettings() {
 
         {filtered.length === 0 ? (
           <Card><CardContent className="p-0">
-            <EmptyState Icon={ScrollText} title="Nothing matches" description="Try a different search or area." />
+            {LOGS.length === 0 ? (
+              <EmptyState
+                Icon={ScrollText}
+                title="No audit entries yet"
+                description="Sensitive actions — voids, money moves, settings changes — will appear here as soon as your team starts working."
+              />
+            ) : (
+              <EmptyState
+                Icon={ScrollText}
+                title="No entries match your filters"
+                description={query.trim() || area !== "all"
+                  ? "Clear the search or pick a different area to widen the view."
+                  : "Try a different search or area."}
+              />
+            )}
           </CardContent></Card>
         ) : (
           <Card><CardContent className="p-0">

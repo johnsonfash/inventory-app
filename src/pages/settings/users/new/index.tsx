@@ -56,24 +56,44 @@ export default function InviteMember() {
   const toggleLocation = (id: string) =>
     setLocationIds((ls) => (ls.includes(id) ? ls.filter((x) => x !== id) : [...ls, id]))
 
+  // Lightweight email format check — same shape the browser's
+  // type="email" uses, but gives us a toast instead of a silent native
+  // popover so the user knows *which* field is wrong.
+  const isValidEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim())
+  const trimmedEmail = email.trim()
+  const emailInvalid = trimmedEmail.length > 0 && !isValidEmail(trimmedEmail)
+
   const submit = async () => {
-    setSubmitting(true)
-    await new Promise((r) => setTimeout(r, 600))
-    setSubmitting(false)
-    if (delivery === "email") {
-      toast.success(`Invitation emailed to ${email || "the recipient"}.`)
-    } else {
-      // Mock token + copy to clipboard
-      const token = `tkn_${Math.random().toString(36).slice(2, 10)}`
-      const link = `https://pallio.app/invite/${token}`
-      try {
-        await navigator.clipboard.writeText(link)
-        toast.success("Invite link copied to clipboard.")
-      } catch {
-        toast.success("Invite created. (Couldn't auto-copy.)")
-      }
+    if (!trimmedEmail) {
+      toast.error("Add an email address to send the invite to.")
+      return
     }
-    navigate("/settings/users?tab=invites")
+    if (!isValidEmail(trimmedEmail)) {
+      toast.error("That email address doesn't look right — check it and try again.")
+      return
+    }
+    setSubmitting(true)
+    try {
+      await new Promise((r) => setTimeout(r, 600))
+      if (delivery === "email") {
+        toast.success(`Invitation emailed to ${trimmedEmail}.`)
+      } else {
+        // Mock token + copy to clipboard
+        const token = `tkn_${Math.random().toString(36).slice(2, 10)}`
+        const link = `https://pallio.app/invite/${token}`
+        try {
+          await navigator.clipboard.writeText(link)
+          toast.success("Invite link copied to clipboard.")
+        } catch {
+          toast.success("Invite created. (Couldn't auto-copy.)")
+        }
+      }
+      navigate("/settings/users?tab=invites")
+    } catch {
+      toast.error("Couldn't send the invite — try again.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -121,8 +141,20 @@ export default function InviteMember() {
       {/* Recipient */}
       <FormSection title="Who" Icon={UserPlus} description="Where Pallio will send the invitation.">
         <FormGrid cols={2}>
-          <FormField label="Email" required>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@business.com" required />
+          <FormField
+            label="Email"
+            required
+            hint={emailInvalid ? "Looks off — make sure it's name@domain.tld." : undefined}
+          >
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@business.com"
+              required
+              aria-invalid={emailInvalid || undefined}
+              className={emailInvalid ? "border-rose-500/60 focus-visible:ring-rose-500/40" : undefined}
+            />
           </FormField>
           <FormField label="Name (optional)" hint="Used to personalise the email.">
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Alex Larson" />
