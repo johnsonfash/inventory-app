@@ -12,6 +12,7 @@ import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
 import { SummaryStrip } from "@/components/lists/summary-strip"
 import { FilterChips, type FilterChip } from "@/components/lists/filter-chips"
 import { useCurrency } from "@/contexts/currency"
+import { useCapability } from "@/hooks/use-industry"
 import { loadRecipes, rollupRecipeCost, ALLERGEN_LABELS } from "@/lib/inventory/recipes"
 import { loadCatalog, type CatalogItem } from "@/lib/pos/storage"
 
@@ -35,6 +36,10 @@ export default function RecipesIndex() {
   const [query, setQuery] = React.useState("")
   const [tagFilter, setTagFilter] = React.useState<string[]>([])
   const { formatPrice } = useCurrency()
+  // Soft capability — heavy use in kitchens, labs, perfume,
+  // manufacturing. Other industries get a hint that the page exists
+  // but might not need it.
+  const usesRecipes = useCapability("usesRecipes")
   useRegisterPageRefresh(React.useCallback(async () => { await new Promise((r) => setTimeout(r, 400)) }, []))
 
   const recipes = React.useMemo(() => loadRecipes(), [])
@@ -123,6 +128,13 @@ export default function RecipesIndex() {
       }
     >
       <div className="flex flex-col gap-4">
+        {!usesRecipes && (
+          <div className="rounded-xl border border-border bg-card p-3 text-xs text-muted-foreground">
+            Recipes (or BOMs) are most useful for kitchens, labs, and
+            assembly. You can still use them — many shops keep a couple
+            for assembled bundles.
+          </div>
+        )}
         <SummaryStrip
           tiles={[
             { label: "Recipes", value: String(recipes.length), tone: "brand", hint: "defined" },

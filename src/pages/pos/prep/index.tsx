@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/lists/empty-state"
 import { CoachMark } from "@/components/onboarding/coach-mark"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
+import { useCapability } from "@/hooks/use-industry"
 import { prepQueue, seedExamplePrep, setLinePrepStatus, type PrepStatus, type PrepTicket } from "@/lib/pos/venue"
 import { cn } from "@/lib/utils"
 
@@ -36,6 +37,10 @@ function waitLabel(firedAt?: number) {
 export default function PrepQueuePage() {
   const [tickets, setTickets] = React.useState<PrepTicket[]>(() => prepQueue())
   const firstTicketRef = React.useRef<HTMLButtonElement>(null)
+  // Soft capability — restaurants/QSR/manufacturing make heavy use,
+  // retail/pharmacy almost never. Banner reminds the operator but
+  // the queue is fully functional regardless.
+  const hasPrepQueue = useCapability("hasPrepQueue")
 
   const reload = React.useCallback(() => setTickets(prepQueue()), [])
 
@@ -73,6 +78,13 @@ export default function PrepQueuePage() {
         </>
       }
     >
+      {!hasPrepQueue && (
+        <div className="mb-3 rounded-xl border border-border bg-card p-3 text-xs text-muted-foreground">
+          A prep queue is most useful for kitchens, prep stations, and
+          assembly. You can still use this screen if your team likes a
+          shared progress board.
+        </div>
+      )}
       {tickets.length === 0 ? (
         <EmptyState
           Icon={Flame}

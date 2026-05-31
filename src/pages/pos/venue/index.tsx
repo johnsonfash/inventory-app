@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useNavigate } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { Flame, Plus, Search, Trash2, Users, Wallet } from "lucide-react"
 import { PageShell } from "@/components/page-shell"
 import { BottomSheet } from "@/components/mobile/bottom-sheet"
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import { CoachMark } from "@/components/onboarding/coach-mark"
 import { useCurrency } from "@/contexts/currency"
+import { useCapability } from "@/hooks/use-industry"
 import { genId, loadCatalog, type CartItem } from "@/lib/pos/storage"
 import {
   closeOpenOrder,
@@ -34,6 +35,11 @@ const STATUS_TONE: Record<Spot["status"], string> = {
 export default function VenuePage() {
   const navigate = useNavigate()
   const { formatPrice } = useCurrency()
+  // SOFT capability check — non-hospitality industries see a polite
+  // explainer at the top, but the page is fully usable if they want
+  // tables anyway (e.g. a clinic with a waiting room). The grid
+  // renders below either way. Never gate-block, just nudge.
+  const hasTables = useCapability("hasTables")
   // Venue label set follows the active POS mode; default to "restaurant"
   // so tables read naturally. The POS settings mode could be threaded in
   // later; the data model is identical regardless of label.
@@ -149,6 +155,21 @@ export default function VenuePage() {
         </>
       }
     >
+      {!hasTables && (
+        // Soft hint for industries that don't typically use a tables
+        // layout — pharmacy, retail, manufacturing. We don't block,
+        // because clinics + barbershops + repair counters can still
+        // get value from chairs/bays.
+        <div className="mb-3 rounded-xl border border-border bg-card p-3 text-xs text-muted-foreground">
+          Your industry doesn't typically use {labels.layout.toLowerCase()}. The
+          screen still works — chairs, bays, rooms, or counters all fit. If you
+          don't need it, you can hide the chip from{" "}
+          <Link to="/pos" className="font-medium text-brand underline-offset-2 hover:underline dark:text-primary">
+            POS
+          </Link>
+          {" "}or POS Settings.
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
         {venue.spots.map((spot, idx) => {
           const order = openOrderForSpot(spot.id)

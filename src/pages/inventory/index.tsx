@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils"
 import { useCurrency } from "@/contexts/currency"
 import { loadCatalog, type CatalogItem } from "@/lib/pos/storage"
 import { deriveUnit, deriveWarranty, UNLIMITED_STOCK } from "@/lib/inventory/derive"
+import { useTerm } from "@/hooks/use-industry"
 
 type Item = {
   sku: string
@@ -160,6 +161,16 @@ export default function InventoryItems() {
   const [query, setQuery] = React.useState("")
   const [filterOpen, setFilterOpen] = React.useState(false)
   const [viewItem, setViewItem] = React.useState<Item | null>(null)
+  // Industry vocab. Restaurants see "Menu items", auto shops "Parts",
+  // pharmacies stay "Items", services see "Services". Falls back to
+  // the retail default if the active profile doesn't override.
+  const inventoryTitle = useTerm("inventory", "Inventory")
+  const itemSingular = useTerm("item", "Item")
+  const itemPlural = useTerm("item.plural", "items")
+  // CTA: "New menu item" / "New part" / "New service".
+  const newItemCta = `New ${itemSingular.toLowerCase()}`
+  // FAB always reads as an action verb.
+  const addItemCta = `Add ${itemSingular.toLowerCase()}`
 
   const [stagedCategories, setStagedCategories] = React.useState<string[]>([])
   const [stagedStock, setStagedStock] = React.useState<StockFilter>("all")
@@ -253,12 +264,12 @@ export default function InventoryItems() {
 
   return (
     <PageShell
-      title="Inventory"
+      title={inventoryTitle}
       withToolbar
       mobileTrailing={<FilterButton onClick={() => setFilterOpen(true)} count={appliedCount} />}
       titleTooltip={
         <>
-          Every product you sell — physical or digital. Each row is a
+          Every {itemPlural.toLowerCase()} you sell — physical or digital. Each row is a
           <strong> SKU</strong> (one unique sellable thing) with its
           live stock count, cost, retail price, and which location
           holds it. The numbers update in real time as you sell,
@@ -276,7 +287,7 @@ export default function InventoryItems() {
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search items, SKU, brand…"
+              placeholder={`Search ${itemPlural.toLowerCase()}, SKU, brand…`}
               className="pl-9"
             />
           </div>
@@ -285,7 +296,7 @@ export default function InventoryItems() {
           </Button>
           <Link to="/inventory/new" className="hidden md:inline-flex">
             <Button>
-              <Plus className="h-4 w-4" /> New item
+              <Plus className="h-4 w-4" /> {newItemCta}
             </Button>
           </Link>
         </div>
@@ -300,7 +311,7 @@ export default function InventoryItems() {
             <CardContent className="p-0">
               <EmptyState
                 Icon={Package2}
-                title="No items match"
+                title={`No ${itemPlural.toLowerCase()} match`}
                 description="Try adjusting filters or clearing the search box."
                 action={
                   <Button
@@ -401,7 +412,7 @@ export default function InventoryItems() {
         </FilterSection>
       </FilterSheet>
 
-      <MobileFab href="/inventory/new" label="Add item" />
+      <MobileFab href="/inventory/new" label={addItemCta} />
     </PageShell>
   )
 }

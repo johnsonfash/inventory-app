@@ -12,7 +12,9 @@ import {
 import { Input } from "@/components/ui/input"
 import { BrandMark } from "@/components/brand-mark"
 import { cn } from "@/lib/utils"
-import { NAV, type NavItem } from "@/lib/nav"
+import { NAV, type NavItem, type SubItem } from "@/lib/nav"
+import { useNavBadge, type BadgeKey } from "@/lib/nav-badges"
+import { useNavCuration, useTerm } from "@/hooks/use-industry"
 
 // Sidebar reads the full app menu from `@/lib/nav` — single source of
 // truth, shared with the mobile More drawer. See lib/nav.ts for the
@@ -21,6 +23,31 @@ const COLLAPSED_KEY = "pallio:sidebar-collapsed"
 
 export function AppSidebar() {
   const pathname = useLocation().pathname
+  // Industry curation: groups the active industry profile typically
+  // doesn't need are demoted to the bottom of the sidebar under a
+  // "Less common for your business" separator. They stay fully
+  // reachable — search still finds them, the routes still resolve,
+  // and a single click navigates. This is SOFT curation, never hard
+  // module gating (see memory: feedback_no_hard_modules).
+  const { softHide } = useNavCuration()
+  // Industry-localised group titles for the sidebar. Profiles can
+  // override "Inventory" → "Pantry" (restaurant) / "Materials"
+  // (manufacturing) / "Parts catalogue" (auto), etc.
+  const inventoryLabel = useTerm("inventory", "Inventory")
+  // Per-title curation. Only the groups whose meaning shifts most
+  // between industries get translated — Dashboard/Settings/Help
+  // stay neutral.
+  const labelForTitle = React.useCallback(
+    (title: string): string => {
+      switch (title) {
+        case "Inventory":
+          return inventoryLabel
+        default:
+          return title
+      }
+    },
+    [inventoryLabel],
+  )
 
   // Persist collapsed state. Read sync so the first paint matches
   // whatever the user picked last session — no resize flash.
@@ -159,6 +186,148 @@ export function AppSidebar() {
     })
   }, [pathname])
 
+  // Partition the filtered nav into "primary" and "demoted" based on
+  // the active industry profile's softHideSections. We never DROP
+  // items — demoted ones just move to the bottom under a separator
+  // and render at reduced opacity. Searching bypasses curation
+  // entirely so a typed match is never silently demoted to the
+  // bottom; it shows up in natural NAV order at the top.
+  const [primaryNav, demotedNav] = React.useMemo<[NavItem[], NavItem[]]>(() => {
+    if (isSearching) return [filteredNav, []]
+    const primary: NavItem[] = []
+    const demoted: NavItem[] = []
+    for (const item of filteredNav) {
+      if (softHide.has(item.title)) demoted.push(item)
+      else primary.push(item)
+    }
+    return [primary, demoted]
+  }, [filteredNav, softHide, isSearching])
+
+  // Single renderer used for both primary and demoted lists. `demoted`
+  // dims the row so the user sees it's been deprioritised — the click
+  // surface is identical either way.
+  const renderNavItem = (item: NavItem, demoted: boolean) => {
+    const active = item.url ? pathname === item.url : item.sub?.some((s) => pathname.startsWith(s.url))
+    if (item.sub) {
+      // When the user is searching, force every group open so
+      // matched sub-items are visible without an extra click.
+      const isOpen = isSearching ? true : openStates[item.title]
+      return (
+        <li
+          key={item.title}
+          className={cn(demoted && !active && "opacity-60 hover:opacity-100 focus-within:opacity-100")}
+        >
+          <button
+            type="button"
+            onClick={(e) => {
+              // Collapsed: clicking the icon opens the flyout
+              // (touch devices have no hover; click is the
+              // fallback). Expanded: toggles the inline tree.
+              if (collapsed) {
+                openFlyout(item.title, e.currentTarget)
+                return
+              }
+              toggle(item.title)
+            }}
+            onMouseEnter={collapsed ? (e) => openFlyout(item.title, e.currentTarget) : undefined}
+            onMouseLeave={collapsed ? scheduleClose : undefined}
+            onFocus={collapsed ? (e) => openFlyout(item.title, e.currentTarget) : undefined}
+            aria-expanded={collapsed ? flyout?.title === item.title : isOpen}
+            aria-controls={!collapsed ? `nav-${slug(item.title)}` : undefined}
+            aria-label={collapsed ? labelForTitle(item.title) : undefined}
+            title={collapsed ? labelForTitle(item.title) : undefined}
+            className={cn(
+              "group/group flex w-full items-center rounded-md text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
+              collapsed ? "relative h-10 justify-center px-0" : "gap-2 px-2 py-2",
+              active && "bg-accent",
+              collapsed && flyout?.title === item.title && "bg-accent",
+            )}
+          >
+            <item.icon className={cn("shrink-0", collapsed ? "h-5 w-5" : "h-4 w-4")} aria-hidden="true" />
+            {collapsed && (
+              // Tiny chevron pinned to the right edge in
+              // collapsed mode — signals "this icon has
+              // sub-items, flyout opens this way".
+              <ChevronRight
+                aria-hidden="true"
+                className={cn(
+                  "absolute right-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-muted-foreground transition-opacity",
+                  flyout?.title === item.title
+                    ? "opacity-100 text-brand dark:text-primary"
+                    : "opacity-40 group-hover/group:opacity-90 group-focus-visible/group:opacity-90",
+                )}
+              />
+            )}
+            {!collapsed && (
+              <>
+                <span className="truncate">{labelForTitle(item.title)}</span>
+                <ChevronDown
+                  className={cn(
+                    "ml-auto h-4 w-4 opacity-60 transition-transform",
+                    isOpen ? "rotate-180" : "rotate-0",
+                  )}
+                  aria-hidden="true"
+                />
+              </>
+            )}
+          </button>
+          {!collapsed && (
+            <div
+              id={`nav-${slug(item.title)}`}
+              className={cn(
+                "grid overflow-hidden pl-6 transition-all",
+                isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+              )}
+            >
+              <ul className="min-h-0 space-y-0.5 border-l border-border pl-2">
+                {item.sub.map((s) => {
+                  const subActive = pathname === s.url
+                  return (
+                    <li key={s.url}>
+                      <Link
+                        aria-current={subActive ? "page" : undefined}
+                        to={s.url}
+                        className={cn(
+                          "flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
+                          subActive && "bg-brand-soft text-brand dark:bg-primary/15 dark:text-primary",
+                        )}
+                      >
+                        <span className="truncate">{s.title}</span>
+                        <SubBadge sub={s} />
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
+        </li>
+      )
+    }
+    return (
+      <li
+        key={item.title}
+        className={cn(demoted && !active && "opacity-60 hover:opacity-100 focus-within:opacity-100")}
+      >
+        <Link
+          aria-current={active ? "page" : undefined}
+          aria-label={collapsed ? labelForTitle(item.title) : undefined}
+          title={collapsed ? labelForTitle(item.title) : undefined}
+          to={item.url!}
+          onMouseEnter={collapsed ? () => { cancelClose(); setFlyout(null) } : undefined}
+          className={cn(
+            "flex items-center rounded-md text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
+            collapsed ? "h-10 justify-center px-0" : "gap-2 px-2 py-2",
+            active && "bg-accent",
+          )}
+        >
+          <item.icon className={cn("shrink-0", collapsed ? "h-5 w-5" : "h-4 w-4")} aria-hidden="true" />
+          {!collapsed && <span className="truncate">{labelForTitle(item.title)}</span>}
+        </Link>
+      </li>
+    )
+  }
+
   return (
     <aside
       className={cn(
@@ -212,122 +381,33 @@ export function AppSidebar() {
           </p>
         ) : null}
         <ul className="space-y-0.5">
-          {filteredNav.map((item) => {
-            const active = item.url ? pathname === item.url : item.sub?.some((s) => pathname.startsWith(s.url))
-            if (item.sub) {
-              // When the user is searching, force every group open so
-              // matched sub-items are visible without an extra click.
-              const isOpen = isSearching ? true : openStates[item.title]
-              return (
-                <li key={item.title}>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      // Collapsed: clicking the icon opens the flyout
-                      // (touch devices have no hover; click is the
-                      // fallback). Expanded: toggles the inline tree.
-                      if (collapsed) {
-                        openFlyout(item.title, e.currentTarget)
-                        return
-                      }
-                      toggle(item.title)
-                    }}
-                    onMouseEnter={collapsed ? (e) => openFlyout(item.title, e.currentTarget) : undefined}
-                    onMouseLeave={collapsed ? scheduleClose : undefined}
-                    onFocus={collapsed ? (e) => openFlyout(item.title, e.currentTarget) : undefined}
-                    aria-expanded={collapsed ? flyout?.title === item.title : isOpen}
-                    aria-controls={!collapsed ? `nav-${slug(item.title)}` : undefined}
-                    aria-label={collapsed ? item.title : undefined}
-                    title={collapsed ? item.title : undefined}
-                    className={cn(
-                      "group/group flex w-full items-center rounded-md text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
-                      collapsed ? "relative h-10 justify-center px-0" : "gap-2 px-2 py-2",
-                      active && "bg-accent",
-                      collapsed && flyout?.title === item.title && "bg-accent",
-                    )}
-                  >
-                    <item.icon className={cn("shrink-0", collapsed ? "h-5 w-5" : "h-4 w-4")} aria-hidden="true" />
-                    {collapsed && (
-                      // Tiny chevron pinned to the right edge in
-                      // collapsed mode — signals "this icon has
-                      // sub-items, flyout opens this way". Becomes
-                      // fully opaque on hover/focus + when the
-                      // flyout is open for this group.
-                      <ChevronRight
-                        aria-hidden="true"
-                        className={cn(
-                          "absolute right-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 text-muted-foreground transition-opacity",
-                          flyout?.title === item.title
-                            ? "opacity-100 text-brand dark:text-primary"
-                            : "opacity-40 group-hover/group:opacity-90 group-focus-visible/group:opacity-90",
-                        )}
-                      />
-                    )}
-                    {!collapsed && (
-                      <>
-                        <span className="truncate">{item.title}</span>
-                        <ChevronDown
-                          className={cn(
-                            "ml-auto h-4 w-4 opacity-60 transition-transform",
-                            isOpen ? "rotate-180" : "rotate-0",
-                          )}
-                          aria-hidden="true"
-                        />
-                      </>
-                    )}
-                  </button>
-                  {!collapsed && (
-                    <div
-                      id={`nav-${slug(item.title)}`}
-                      className={cn(
-                        "grid overflow-hidden pl-6 transition-all",
-                        isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
-                      )}
-                    >
-                      <ul className="min-h-0 space-y-0.5 border-l border-border pl-2">
-                        {item.sub.map((s) => {
-                          const subActive = pathname === s.url
-                          return (
-                            <li key={s.url}>
-                              <Link
-                                aria-current={subActive ? "page" : undefined}
-                                to={s.url}
-                                className={cn(
-                                  "block rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
-                                  subActive && "bg-brand-soft text-brand dark:bg-primary/15 dark:text-primary",
-                                )}
-                              >
-                                {s.title}
-                              </Link>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    </div>
-                  )}
-                </li>
-              )
-            }
-            return (
-              <li key={item.title}>
-                <Link
-                  aria-current={active ? "page" : undefined}
-                  aria-label={collapsed ? item.title : undefined}
-                  title={collapsed ? item.title : undefined}
-                  to={item.url!}
-                  onMouseEnter={collapsed ? () => { cancelClose(); setFlyout(null) } : undefined}
-                  className={cn(
-                    "flex items-center rounded-md text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
-                    collapsed ? "h-10 justify-center px-0" : "gap-2 px-2 py-2",
-                    active && "bg-accent",
-                  )}
-                >
-                  <item.icon className={cn("shrink-0", collapsed ? "h-5 w-5" : "h-4 w-4")} aria-hidden="true" />
-                  {!collapsed && <span className="truncate">{item.title}</span>}
-                </Link>
-              </li>
-            )
-          })}
+          {/* Primary groups — everything not on this industry's
+              softHide list. While searching, curation is bypassed so
+              the user sees ALL matches in their natural order — search
+              should never silently demote a hit. */}
+          {primaryNav.map((item) => renderNavItem(item, false))}
+
+          {/* Demoted groups — typically not relevant for this
+              industry. Rendered with a separator + muted opacity, but
+              still fully functional. The user can click in and stay
+              there; nothing is gated. Skipped when searching so a
+              demoted match doesn't get hidden under a separator. */}
+          {!isSearching && demotedNav.length > 0 && (
+            <li aria-hidden="true" className={cn("pt-3", collapsed && "px-0")}>
+              {collapsed ? (
+                <div className="mx-2 border-t border-border" />
+              ) : (
+                <div className="flex items-center gap-2 px-2 pb-1.5">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Less common for your business
+                  </span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+              )}
+            </li>
+          )}
+          {!isSearching && demotedNav.map((item) => renderNavItem(item, true))}
         </ul>
       </nav>
 
@@ -362,7 +442,7 @@ export function AppSidebar() {
                 exit={{ opacity: 0, x: -4 }}
                 transition={{ duration: 0.12 }}
                 role="menu"
-                aria-label={flyoutItem.title}
+                aria-label={labelForTitle(flyoutItem.title)}
                 onMouseEnter={cancelClose}
                 onMouseLeave={scheduleClose}
                 style={{
@@ -376,7 +456,7 @@ export function AppSidebar() {
               >
                 <div className="shrink-0 border-b border-border px-3 py-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    {flyoutItem.title}
+                    {labelForTitle(flyoutItem.title)}
                   </p>
                 </div>
                 <ul className="min-h-0 flex-1 overflow-y-auto p-1.5">
@@ -390,13 +470,14 @@ export function AppSidebar() {
                           aria-current={subActive ? "page" : undefined}
                           role="menuitem"
                           className={cn(
-                            "block rounded-md px-2.5 py-1.5 text-xs transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
+                            "flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
                             subActive
                               ? "bg-brand-soft text-brand dark:bg-primary/15 dark:text-primary"
                               : "text-foreground",
                           )}
                         >
-                          {s.title}
+                          <span className="truncate">{s.title}</span>
+                          <SubBadge sub={s} />
                         </Link>
                       </li>
                     )
@@ -418,4 +499,18 @@ function clamp(value: number, min: number, max: number): number {
 
 function slug(s: string): string {
   return s.replace(/\s+/g, "-").toLowerCase()
+}
+
+// Live count pill for sub-items that opt in via `badgeKey`. No-op for
+// items without a badge or when the count is zero — the layout stays
+// stable because the parent uses `justify-between` with this on the
+// trailing side.
+function SubBadge({ sub }: { sub: SubItem }) {
+  const count = useNavBadge(sub.badgeKey as BadgeKey | undefined)
+  if (!sub.badgeKey || count <= 0) return null
+  return (
+    <span className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold leading-none text-brand-foreground dark:bg-primary dark:text-primary-foreground">
+      {count > 99 ? "99+" : count}
+    </span>
+  )
 }

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
+import { useCapability } from "@/hooks/use-industry"
 import { EmptyState } from "@/components/lists/empty-state"
 import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
 import { SummaryStrip } from "@/components/lists/summary-strip"
@@ -26,6 +27,9 @@ function expiryTone(days: number | null): StatusTone {
 export default function LotsIndex() {
   const [query, setQuery] = React.useState("")
   const [filter, setFilter] = React.useState<"all" | "expiring" | "low" | "no-expiry">("all")
+  // Soft capability — critical for food, pharma, cosmetics. Other
+  // industries get a quiet hint but can still track lots if useful.
+  const usesLotTracking = useCapability("usesLotTracking")
   useRegisterPageRefresh(React.useCallback(async () => { await new Promise((r) => setTimeout(r, 400)) }, []))
 
   const lots = React.useMemo(() => loadLots(), [])
@@ -88,6 +92,13 @@ export default function LotsIndex() {
       }
     >
       <div className="flex flex-col gap-4">
+        {!usesLotTracking && (
+          <div className="rounded-xl border border-border bg-card p-3 text-xs text-muted-foreground">
+            Lot &amp; batch tracking matters most for food, pharma, and
+            cosmetics. You can still use it for any item — handy when a
+            warranty or production date needs to be tied to a unit.
+          </div>
+        )}
         <SummaryStrip
           tiles={[
             { label: "Active lots", value: String(totalLots), tone: "brand", hint: "tracked" },

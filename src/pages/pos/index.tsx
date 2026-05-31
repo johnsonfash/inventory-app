@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input"
 import { useCurrency } from "@/contexts/currency"
 import { useAutoMarkStep } from "@/hooks/use-auto-mark-step"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { useCapability, useTerm } from "@/hooks/use-industry"
 import {
   findVirtualAccount,
   listCashiersForLocation,
@@ -94,6 +95,18 @@ export default function PointOfSale() {
   const orderIdFromUrl = search.get("orderId")
   const isMobile = useIsMobile(1024);
   const { formatPrice } = useCurrency()
+  // Tip presets: the active industry profile decides whether tips
+  // should be SHOWN by default at the till. Restaurants + services +
+  // hotels: on. Retail + auto + pharmacy + manufacturing: off. The
+  // operator can still toggle in POS settings — this is just the
+  // sensible default per industry. Falls back to per-mode behaviour
+  // (restaurant / services mode) so a cross-industry org running
+  // restaurant POS still gets prompts even if the org profile is
+  // retail.
+  const tipSuggestedByIndustry = useCapability("tipSuggested")
+  // Header label: "Point of sale" / "Check" / "Ticket" depending on
+  // industry. We pluralise at the section title level.
+  const saleLabel = useTerm("sale", "Sale")
 
   React.useEffect(() => {
     seedPosDemo()
@@ -600,14 +613,17 @@ export default function PointOfSale() {
 
   return (
     <PageShell
-      title="Point of sale"
+      // Header reads "Point of sale · Check" / "Point of sale ·
+      // Ticket" / "Point of sale · Work order" so the operator sees
+      // the right vocabulary without us renaming the whole module.
+      title={saleLabel === "Sale" ? "Point of sale" : `Point of sale · ${saleLabel}`}
       withToolbar={false}
       titleTooltip={
         <>
           The till. Tap items from the catalog to build a cart, scan a
           barcode for the fastest entry, then take payment (cash,
-          card, transfer, or split). Every sale rung up here updates
-          stock and the dashboard instantly. Drafts let you park a
+          card, transfer, or split). Every {saleLabel.toLowerCase()} rung up here
+          updates stock and the dashboard instantly. Drafts let you park a
           cart and resume later.
         </>
       }
@@ -889,7 +905,7 @@ export default function PointOfSale() {
         total={total}
         tip={tip}
         onTipChange={setTip}
-        tipSuggested={mode === "restaurant" || mode === "services"}
+        tipSuggested={tipSuggestedByIndustry || mode === "restaurant" || mode === "services"}
         payments={payments}
         onAddPayment={addPayment}
         onRemovePayment={removePayment}

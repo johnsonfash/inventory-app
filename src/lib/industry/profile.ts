@@ -47,6 +47,7 @@ export type TermKey =
   | "item.plural"    // items / menu items / parts / treatments
   | "sku"            // sku / barcode / plu / part-number
   | "customer"       // customer / guest / patient / client / member
+  | "customer.plural" // customers / guests / patients / clients / members
   | "sale"           // sale / order / ticket / check / work order
   | "sale.plural"    // sales / checks / work orders
   | "invoice"        // invoice / receipt / bill / folio
@@ -97,6 +98,7 @@ export const INDUSTRIES: Readonly<Record<IndustryKey, IndustryProfile>> = {
       "item.plural": "items",
       sku: "SKU",
       customer: "Customer",
+      "customer.plural": "customers",
       sale: "Sale",
       "sale.plural": "sales",
       invoice: "Invoice",
@@ -130,6 +132,7 @@ export const INDUSTRIES: Readonly<Record<IndustryKey, IndustryProfile>> = {
       "item.plural": "menu items",
       sku: "PLU",
       customer: "Guest",
+      "customer.plural": "guests",
       sale: "Check",
       "sale.plural": "checks",
       invoice: "Check",
@@ -163,6 +166,7 @@ export const INDUSTRIES: Readonly<Record<IndustryKey, IndustryProfile>> = {
       "item.plural": "menu items",
       sku: "PLU",
       customer: "Guest",
+      "customer.plural": "guests",
       sale: "Ticket",
       "sale.plural": "tickets",
       invoice: "Receipt",
@@ -199,6 +203,7 @@ export const INDUSTRIES: Readonly<Record<IndustryKey, IndustryProfile>> = {
       "item.plural": "services",
       sku: "Service code",
       customer: "Client",
+      "customer.plural": "clients",
       sale: "Booking",
       "sale.plural": "bookings",
       invoice: "Invoice",
@@ -234,6 +239,7 @@ export const INDUSTRIES: Readonly<Record<IndustryKey, IndustryProfile>> = {
       "item.plural": "parts",
       sku: "Part number",
       customer: "Customer",
+      "customer.plural": "customers",
       sale: "Work order",
       "sale.plural": "work orders",
       invoice: "Invoice",
@@ -266,6 +272,7 @@ export const INDUSTRIES: Readonly<Record<IndustryKey, IndustryProfile>> = {
       "item.plural": "styles",
       sku: "SKU",
       customer: "Customer",
+      "customer.plural": "customers",
       sale: "Sale",
       "sale.plural": "sales",
       invoice: "Invoice",
@@ -298,6 +305,7 @@ export const INDUSTRIES: Readonly<Record<IndustryKey, IndustryProfile>> = {
       "item.plural": "items",
       sku: "SKU",
       customer: "Patient",
+      "customer.plural": "patients",
       sale: "Sale",
       "sale.plural": "sales",
       invoice: "Receipt",
@@ -332,6 +340,7 @@ export const INDUSTRIES: Readonly<Record<IndustryKey, IndustryProfile>> = {
       "item.plural": "plans",
       sku: "Plan code",
       customer: "Member",
+      "customer.plural": "members",
       sale: "Booking",
       "sale.plural": "bookings",
       invoice: "Invoice",
@@ -367,6 +376,7 @@ export const INDUSTRIES: Readonly<Record<IndustryKey, IndustryProfile>> = {
       "item.plural": "rooms & services",
       sku: "Code",
       customer: "Guest",
+      "customer.plural": "guests",
       sale: "Reservation",
       "sale.plural": "reservations",
       invoice: "Folio",
@@ -400,6 +410,7 @@ export const INDUSTRIES: Readonly<Record<IndustryKey, IndustryProfile>> = {
       "item.plural": "SKUs",
       sku: "SKU",
       customer: "Customer",
+      "customer.plural": "customers",
       sale: "Order",
       "sale.plural": "orders",
       invoice: "Invoice",

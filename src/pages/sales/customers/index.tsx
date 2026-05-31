@@ -22,6 +22,7 @@ import { SwipeableRow } from "@/components/mobile/swipeable-row"
 import { Avatar } from "@/components/avatar"
 import { AddCustomerDialog, type QuickCustomer } from "@/components/dialogs/add-customer-dialog"
 import { useCurrency } from "@/contexts/currency"
+import { useTerm } from "@/hooks/use-industry"
 
 type Customer = {
   name: string
@@ -63,6 +64,13 @@ export default function Customers() {
   const isMobile = useIsMobile()
   const [query, setQuery] = React.useState("")
   const { formatPrice } = useCurrency()
+  // Industry vocab — restaurants see "Guests", services "Clients",
+  // pharmacies "Patients", gyms "Members", hotels "Guests".
+  const customerSingularRaw = useTerm("customer", "Customer")
+  const customerPluralRaw = useTerm("customer.plural", "Customers")
+  const customerPlural =
+    customerPluralRaw.charAt(0).toUpperCase() + customerPluralRaw.slice(1)
+  const addCustomerCta = `Add ${customerSingularRaw.toLowerCase()}`
 
   // Seed from the mock catalogue, then keep it in state so a quick-add
   // shows up immediately. The backend will own this list later; until
@@ -110,21 +118,21 @@ export default function Customers() {
 
   return (
     <PageShell
-      title="Customers"
+      title={customerPlural}
       withToolbar
       titleTooltip={
         <>
           People + businesses who buy from you. Each row stores their
           contact info, payment terms, default price list, lifetime
           spend, and the orders they've placed. "Walk-in (cash)" is a
-          catch-all for retail shoppers without an account.
+          catch-all for shoppers without an account.
         </>
       }
     >
       <div className="flex flex-col gap-4">
         <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1 scrollbar-hide snap-x snap-mandatory md:mx-0 md:grid md:grid-cols-4 md:gap-3 md:overflow-visible md:px-0">
           {[
-            { label: "Customers", value: rows.length.toLocaleString(), tone: "brand" as StatusTone },
+            { label: customerPlural, value: rows.length.toLocaleString(), tone: "brand" as StatusTone },
             { label: "VIPs", value: String(vipCount), tone: "info" as StatusTone },
             { label: "New (30d)", value: String(newCount), tone: "success" as StatusTone },
             { label: "Lifetime spend", value: formatPrice(ltv), tone: "warning" as StatusTone },
@@ -155,13 +163,13 @@ export default function Customers() {
             />
           </div>
           <Button className="hidden md:inline-flex" onClick={() => setAddOpen(true)}>
-            <Plus className="h-4 w-4" /> Add customer
+            <Plus className="h-4 w-4" /> {addCustomerCta}
           </Button>
         </div>
 
         {lapsedCount > 0 && (
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
-            <span className="font-semibold">{lapsedCount} lapsed customers</span> haven't ordered in 90+ days — consider a re-engagement campaign.
+            <span className="font-semibold">{lapsedCount} lapsed {customerPluralRaw.toLowerCase()}</span> haven't ordered in 90+ days — consider a re-engagement campaign.
           </div>
         )}
 
@@ -170,11 +178,11 @@ export default function Customers() {
             <CardContent className="p-0">
               <EmptyState
                 Icon={Users}
-                title="No customers match"
+                title={`No ${customerPluralRaw.toLowerCase()} match`}
                 description="Try a different name or email."
                 action={
                   <Button onClick={() => setAddOpen(true)}>
-                    <UserPlus className="h-4 w-4" /> Add customer
+                    <UserPlus className="h-4 w-4" /> {addCustomerCta}
                   </Button>
                 }
               />
@@ -280,7 +288,7 @@ export default function Customers() {
         )}
       </div>
 
-      <MobileFab onClick={() => setAddOpen(true)} label="Add customer" />
+      <MobileFab onClick={() => setAddOpen(true)} label={addCustomerCta} />
 
       <AddCustomerDialog open={addOpen} onClose={() => setAddOpen(false)} onCreate={handleCreate} />
     </PageShell>

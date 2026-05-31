@@ -10,6 +10,7 @@ import { BottomSheet } from "@/components/mobile/bottom-sheet"
 import { MobileFab } from "@/components/mobile/mobile-fab"
 import { AddAppointmentDialog, type QuickAppt } from "@/components/dialogs/add-appointment-dialog"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
+import { useCapability } from "@/hooks/use-industry"
 import { EmptyState } from "@/components/lists/empty-state"
 import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
 import { cn } from "@/lib/utils"
@@ -113,6 +114,10 @@ export default function Appointments() {
   const [selected, setSelected] = React.useState(todayISO)
   const [appts, setAppts] = React.useState<Appt[]>(SEED_APPOINTMENTS)
   const [addOpen, setAddOpen] = React.useState(false)
+  // Soft capability — salons, clinics, gyms, hotels, auto shops use
+  // this heavily. Retail/pharmacy/manufacturing get a quiet hint
+  // since some still book consults or fittings.
+  const usesAppointments = useCapability("usesAppointments")
 
   const handleCreate = (a: QuickAppt) => {
     setAppts((prev) => [
@@ -200,6 +205,13 @@ export default function Appointments() {
       }
     >
       <div className="flex flex-col gap-4">
+        {!usesAppointments && (
+          <div className="rounded-xl border border-border bg-card p-3 text-xs text-muted-foreground">
+            Appointments are most useful for salons, clinics, gyms, hotels,
+            and workshops. You can still use the calendar — handy for
+            pickups, fittings, and consult bookings.
+          </div>
+        )}
         {/* Header strip */}
         <div className="flex items-end justify-between gap-2">
           <div className="min-w-0">

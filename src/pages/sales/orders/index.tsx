@@ -25,6 +25,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { INVOICES, ORDERS, invoiceByOrder } from "@/lib/sales/data"
 import type { Order, OrderStatus } from "@/lib/sales/types"
 import { useCurrency } from "@/contexts/currency"
+import { useTerm } from "@/hooks/use-industry"
 import { cn } from "@/lib/utils"
 
 const STEPS: { key: OrderStatus | "paid"; label: string }[] = [
@@ -73,6 +74,12 @@ export default function SalesOrders() {
   const [statusFilter, setStatusFilter] = React.useState<OrderStatus | "all">("all")
   const [invoicingId, setInvoicingId] = React.useState<string | null>(null)
   const { formatPrice: fmtMoney, formatCompact } = useCurrency()
+  // Restaurant: "Checks", QSR: "Tickets", auto: "Work orders", services: "Bookings".
+  // Default "Order" stays the title for retail / apparel / pharmacy.
+  const saleSingularRaw = useTerm("sale", "Order")
+  const salePluralRaw = useTerm("sale.plural", "orders")
+  const salePlural = salePluralRaw.charAt(0).toUpperCase() + salePluralRaw.slice(1)
+  const newOrderCta = `New ${saleSingularRaw.toLowerCase()}`
 
   const onInvoiceOrder = async (orderId: string) => {
     if (invoicingId) return
@@ -101,12 +108,12 @@ export default function SalesOrders() {
 
   return (
     <PageShell
-      title="Sales orders"
+      title={`Sales ${salePluralRaw.toLowerCase()}`}
       withToolbar
       titleTooltip={
         <>
-          A <strong>sales order</strong> is what you create when a
-          customer agrees to buy — but before money changes hands or
+          A <strong>sales {saleSingularRaw.toLowerCase()}</strong> is what you
+          create when a customer agrees to buy — but before money changes hands or
           the goods leave the shelf. Pallio holds the stock so it
           can't get sold twice, then converts it to an invoice + a
           shipment once you're ready.
@@ -117,7 +124,7 @@ export default function SalesOrders() {
         <OnboardingNudge stepKey="first-sale" cta="Make first sale" />
         <SummaryStrip
           tiles={[
-            { label: "Orders",     value: String(ORDERS.length),         tone: "brand",   hint: "all time" },
+            { label: salePlural,   value: String(ORDERS.length),         tone: "brand",   hint: "all time" },
             { label: "Drafts",     value: String(drafts),                tone: "warning", hint: "in progress" },
             { label: "Invoiced",   value: String(invoiced),              tone: "info",    hint: "billed out" },
             { label: "Open total", value: formatCompact(total),  tone: "success", hint: "across pipeline" },
@@ -149,7 +156,7 @@ export default function SalesOrders() {
               <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search number, customer…" className="pl-9" />
             </div>
             <Link to="/sales/orders/new" className="hidden sm:inline-flex">
-              <Button><Plus className="h-4 w-4" /> New order</Button>
+              <Button><Plus className="h-4 w-4" /> {newOrderCta}</Button>
             </Link>
           </div>
         </div>
@@ -167,11 +174,11 @@ export default function SalesOrders() {
         {filtered.length === 0 ? (
           <EmptyState
             Icon={ClipboardList}
-            title="No orders match"
+            title={`No ${salePluralRaw.toLowerCase()} match`}
             description="Try a different filter or search."
             action={
               <Link to="/sales/orders/new">
-                <Button><Plus className="h-4 w-4" /> New order</Button>
+                <Button><Plus className="h-4 w-4" /> {newOrderCta}</Button>
               </Link>
             }
           />

@@ -22,6 +22,7 @@ import { generateInsights } from "@/lib/insights/engine"
 import { GettingStarted } from "@/components/onboarding/getting-started"
 import { FirstRunModal } from "@/components/onboarding/first-run-modal"
 import { useCurrency } from "@/contexts/currency"
+import { useTerm } from "@/hooks/use-industry"
 
 // Spark series — tiny mock data per KPI. Replace with real series
 // from the analytics endpoint once the backend lands.
@@ -54,6 +55,12 @@ export default function Dashboard() {
 
   const insights = React.useMemo(() => generateInsights().slice(0, 6), [])
   const { formatPrice } = useCurrency()
+  // Industry vocab so the KPI strip reads naturally for the active
+  // business — "Open checks" for a restaurant, "Open work orders"
+  // for an auto shop, "Open orders" elsewhere.
+  const salePluralRaw = useTerm("sale.plural", "orders")
+  const salePlural = salePluralRaw.charAt(0).toUpperCase() + salePluralRaw.slice(1)
+  const inventoryWord = useTerm("inventory", "Inventory").toLowerCase()
 
   return (
     <PageShell
@@ -156,7 +163,7 @@ export default function Dashboard() {
                 tooltip: "Total money taken in over the last 7 days from every channel — POS, online, wholesale. Excludes refunds. Comparison is against the previous 7-day window.",
               },
               {
-                title: "Units in stock",
+                title: `Units in ${inventoryWord}`,
                 value: "15,940",
                 delta: "+1.1%",
                 trend: "up",
@@ -164,10 +171,10 @@ export default function Dashboard() {
                 Icon: Layers,
                 tone: "emerald",
                 data: sparkUnits,
-                tooltip: "Total quantity on hand across every store + warehouse. Counts each physical item once — a tee in Lekki and a tee in Ikeja both count toward this total.",
+                tooltip: `Total quantity on hand across every location. Counts each physical unit once — a unit in Lekki and a unit in Ikeja both count toward this total.`,
               },
               {
-                title: "Open orders",
+                title: `Open ${salePlural.toLowerCase()}`,
                 value: "87",
                 delta: "+5.6%",
                 trend: "up",
@@ -175,7 +182,7 @@ export default function Dashboard() {
                 Icon: ShoppingCart,
                 tone: "sky",
                 data: sparkOrders,
-                tooltip: "Sales orders that have been paid for but not yet shipped + delivered. Watch this — high or growing means fulfilment is bottlenecked.",
+                tooltip: `${salePlural} that have been paid for but not yet shipped + delivered. Watch this — high or growing means fulfilment is bottlenecked.`,
               },
               {
                 title: "Out of stock",
