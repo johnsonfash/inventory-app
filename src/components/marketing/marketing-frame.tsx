@@ -8,7 +8,7 @@ import { ModeToggle } from "@/components/mode-toggle"
 import { SignInModal } from "@/components/marketing/sign-in-modal"
 import { WhatsAppButton } from "@/components/marketing/whatsapp-button"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { isNative } from "@/hooks/use-native"
+import { isNative, haptic } from "@/hooks/use-native"
 import { cn } from "@/lib/utils"
 
 // App-shell = installed PWA or Tauri (desktop / iOS / Android). In
@@ -93,7 +93,10 @@ export function MarketingFrame({ children }: { children: React.ReactNode }) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
             className="fixed inset-0 z-40 bg-background/85 backdrop-blur-md"
-            onClick={() => setNavOpen(false)}
+            onClick={() => {
+              haptic.light()
+              setNavOpen(false)
+            }}
           >
             <motion.nav
               initial={{ y: -16, opacity: 0 }}

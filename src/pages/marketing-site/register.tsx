@@ -14,6 +14,7 @@ import {
   Wifi,
   Zap,
 } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { BrandMark } from "@/components/brand-mark"
@@ -85,14 +86,30 @@ export default function RegisterPage() {
     const name  = (data.get("name") as string)  || ""
     if (!email) return
     setBusy(true)
-    await finishSignUp(email, name)
+    try {
+      await finishSignUp(email, name)
+    } catch {
+      // Backend will throw on duplicate email / network / validation
+      // errors; surface that instead of silently dropping the user.
+      setBusy(false)
+      haptic.warning()
+      toast.error("Couldn't create your account. Please try again.")
+    }
   }
 
   const continueWithGoogle = async () => {
     setBusy(true)
     haptic.light()
-    // Mock: pretend Google returned an email + name.
-    await finishSignUp("you@gmail.com", "Tosin Fashanu")
+    try {
+      // Mock: pretend Google returned an email + name. Real OAuth wires
+      // here — if the user cancels or auth fails, surface a toast and
+      // reset the button instead of silently navigating away.
+      await finishSignUp("you@gmail.com", "Tosin Fashanu")
+    } catch {
+      setBusy(false)
+      haptic.warning()
+      toast.error("Google sign-up was cancelled or failed. Please try again.")
+    }
   }
 
   return (
@@ -236,12 +253,13 @@ export default function RegisterPage() {
               name="password"
               type="password"
               autoComplete="new-password"
-              placeholder="At least 8 characters"
+              placeholder="••••••••"
               minLength={8}
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+            <span className="text-[10px] text-muted-foreground">At least 8 characters.</span>
             {/* Strength meter — 4-segment bar that lights up as the
                 password gets stronger. Pure feedback; backend should
                 re-validate before accepting. */}

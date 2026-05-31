@@ -3,6 +3,7 @@ import { createPortal } from "react-dom"
 import { Link, useNavigate } from "react-router-dom"
 import { AnimatePresence, motion } from "framer-motion"
 import { ArrowRight, Github, Lock, Mail, ShieldCheck, Sparkles, X } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -52,11 +53,49 @@ export function SignInModal({ open, onClose }: Props) {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    // Client-side validation — HTML5 required handles presence; this
+    // covers malformed email + too-short password before we bother
+    // the backend.
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+    if (!emailOk) {
+      toast.error("Please enter a valid email address.")
+      return
+    }
+    if (password.length < 8) {
+      toast.error("Password must be at least 8 characters.")
+      return
+    }
+    if (tab === "signup" && !name.trim()) {
+      toast.error("Please enter your name.")
+      return
+    }
     setBusy(true)
-    await new Promise((r) => setTimeout(r, 600))
-    setBusy(false)
-    onClose()
-    navigate("/dashboard")
+    try {
+      await new Promise((r) => setTimeout(r, 600))
+      onClose()
+      navigate("/dashboard")
+    } catch {
+      toast.error("Something went wrong. Please try again.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Mock SSO handlers — show a brief busy state + surface a toast on
+  // cancel/failure when real OAuth wires in. Today's mock always
+  // resolves, but the shape is ready for `signInWithGoogle()` / Apple
+  // ID web flow to slot in without re-plumbing the buttons.
+  const continueWithSso = async (provider: "Google" | "Apple") => {
+    setBusy(true)
+    try {
+      await new Promise((r) => setTimeout(r, 400))
+      onClose()
+      navigate("/dashboard")
+    } catch {
+      toast.error(`${provider} sign-in was cancelled or failed. Please try again.`)
+    } finally {
+      setBusy(false)
+    }
   }
 
   if (typeof document === "undefined") return null
@@ -133,10 +172,10 @@ export function SignInModal({ open, onClose }: Props) {
 
             {/* SSO */}
             <div className="grid grid-cols-2 gap-2 p-5 pb-3">
-              <Button variant="outline" size="sm" type="button" onClick={() => navigate("/dashboard")}>
+              <Button variant="outline" size="sm" type="button" disabled={busy} onClick={() => continueWithSso("Google")}>
                 <GoogleMark /> Google
               </Button>
-              <Button variant="outline" size="sm" type="button" onClick={() => navigate("/dashboard")}>
+              <Button variant="outline" size="sm" type="button" disabled={busy} onClick={() => continueWithSso("Apple")}>
                 <AppleMark /> Apple
               </Button>
             </div>
@@ -189,8 +228,8 @@ export function SignInModal({ open, onClose }: Props) {
                     <input type="checkbox" defaultChecked className="h-3.5 w-3.5 accent-violet-600" />
                     Stay signed in
                   </label>
-                  <Link to="/contact" onClick={onClose} className="font-medium text-brand hover:underline dark:text-primary">
-                    Forgot password?
+                  <Link to="/contact#chat" onClick={onClose} className="font-medium text-brand hover:underline dark:text-primary">
+                    Reset via support
                   </Link>
                 </div>
               )}

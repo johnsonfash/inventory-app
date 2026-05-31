@@ -11,6 +11,7 @@ import {
   Smile,
   Sparkles,
 } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { BrandMark } from "@/components/brand-mark"
@@ -147,7 +148,12 @@ export default function LoginPage() {
     setBusy(true)
     haptic.light()
     const ok = await passkeyVerify()
-    if (!ok) { setBusy(false); haptic.warning(); return }
+    if (!ok) {
+      setBusy(false)
+      haptic.warning()
+      toast.error("Passkey verification failed. Try again or use email and password.")
+      return
+    }
     await finishSignIn(lastEmail || "you@business.com")
   }
 
@@ -158,6 +164,7 @@ export default function LoginPage() {
     if (!ok) {
       setBusy(false)
       haptic.warning()
+      toast.error("Biometric verification failed. Try again or use email and password.")
       return
     }
     await finishSignIn(lastEmail || "you@business.com")
@@ -234,8 +241,8 @@ export default function LoginPage() {
               <input type="checkbox" defaultChecked className="h-3.5 w-3.5 accent-violet-600" />
               Stay signed in
             </label>
-            <Link to="/contact" className="font-medium text-brand hover:underline dark:text-primary">
-              Forgot password?
+            <Link to="/contact#chat" className="font-medium text-brand hover:underline dark:text-primary">
+              Reset via support
             </Link>
           </div>
 

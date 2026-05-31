@@ -16,11 +16,36 @@ export default function ContactPage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const form = e.currentTarget as HTMLFormElement
+    const data = new FormData(form)
+    const email = ((data.get("email") as string) || "").trim()
+    const message = ((data.get("message") as string) || "").trim()
+
+    // Lightweight client-side validation — HTML5 required attrs cover
+    // presence; this catches malformed email + too-short messages so
+    // we don't bother the backend with obvious junk.
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    if (!emailOk) {
+      toast.error("Please enter a valid email address.")
+      return
+    }
+    if (message.length < 10) {
+      toast.error("Please add a few more details so we can help.")
+      return
+    }
+
     setSubmitting(true)
-    await new Promise((r) => setTimeout(r, 700))
-    setSubmitting(false)
-    toast.success("Thanks. We'll get back to you within a business day.")
-    ;(e.target as HTMLFormElement).reset()
+    try {
+      await new Promise((r) => setTimeout(r, 700))
+      toast.success("Thanks. We'll get back to you within a business day.")
+      form.reset()
+    } catch {
+      // Real backend will throw on network/API errors; preserve the
+      // form so the user doesn't lose what they typed.
+      toast.error("Something went wrong sending your message. Please try again.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -69,7 +94,7 @@ export default function ContactPage() {
               </Field>
               <Field label="Topic" Icon={MessageSquare}>
                 <Select defaultValue="general">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Choose a topic" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="general">General question</SelectItem>
                     <SelectItem value="sales">Sales / pricing</SelectItem>
@@ -116,6 +141,13 @@ export default function ContactPage() {
                     >
                       +234 903 672 3177
                     </a>
+                    {/* wa.me opens the WhatsApp app on mobile or
+                        WhatsApp Web on desktop; if the user has
+                        neither it lands on a download prompt. Hint
+                        keeps the expectation honest. */}
+                    <p className="text-[11px] text-muted-foreground">
+                      Opens WhatsApp app or web. Email or call below if you don't use WhatsApp.
+                    </p>
                   </div>
                 </li>
                 <li className="flex items-start gap-3">

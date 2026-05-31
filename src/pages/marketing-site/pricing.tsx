@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
 import { ArrowRight, Check, Gift, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -189,11 +189,23 @@ function fmtNaira(amount: number): string {
 }
 
 export default function PricingPage() {
+  const navigate = useNavigate()
   const [billing, setBilling] = React.useState<"monthly" | "yearly">("monthly")
+  // Tracks which tier is mid-navigation so its CTA shows a loading
+  // label instead of jumping silently — matches the feedback pattern
+  // used on the contact form's Send button.
+  const [startingTier, setStartingTier] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     document.title = "Pricing · Pallio"
   }, [])
+
+  const startTrial = (tierId: string) => {
+    setStartingTier(tierId)
+    // Brief delay so the loading state is visible; real flow may go
+    // through an account-creation handshake before /dashboard.
+    window.setTimeout(() => navigate("/dashboard"), 250)
+  }
 
   return (
     <div className="px-4 py-12 md:px-6 md:py-20">
@@ -306,12 +318,16 @@ export default function PricingPage() {
                   }
                 </p>
 
-                <Link to="/dashboard" className="mt-5">
-                  <Button className="w-full" variant={tier.highlight ? "default" : "outline"}>
-                    {tier.cta}
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Button>
-                </Link>
+                <Button
+                  type="button"
+                  className="mt-5 w-full"
+                  variant={tier.highlight ? "default" : "outline"}
+                  disabled={startingTier !== null}
+                  onClick={() => startTrial(tier.id)}
+                >
+                  {startingTier === tier.id ? "Just a sec…" : tier.cta}
+                  {startingTier !== tier.id && <ArrowRight className="h-3.5 w-3.5" />}
+                </Button>
 
                 <ul className="mt-6 flex flex-1 flex-col gap-2.5 text-sm">
                   {tier.features.map((f) => (
