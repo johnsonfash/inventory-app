@@ -27,7 +27,7 @@ type Filing = {
   reference?: string
 }
 
-const FILINGS: Filing[] = [
+const SEED_FILINGS: Filing[] = [
   { id: "VAT-2026-04", kind: "VAT",  period: "April 2026",   due: "May 21, 2026",  taxable: 4_182_400, taxAmount:  313_680, status: "due" },
   { id: "WHT-2026-04", kind: "WHT",  period: "April 2026",   due: "May 21, 2026",  taxable:   840_000, taxAmount:   42_000, status: "due" },
   { id: "PAYE-2026-04",kind: "PAYE", period: "April 2026",   due: "May 10, 2026",  taxable: 1_840_000, taxAmount:  168_400, status: "overdue" },
@@ -60,13 +60,39 @@ export default function Taxes() {
   // account — output tax collected, input tax reclaimable, net to remit.
   const vat = React.useMemo(() => { seedExampleLedger(); return vatSummary() }, [])
 
-  const due       = FILINGS.filter((f) => f.status === "due" || f.status === "overdue").reduce((s, f) => s + f.taxAmount, 0)
-  const filedYtd  = FILINGS.filter((f) => f.status === "filed").reduce((s, f) => s + f.taxAmount, 0)
-  const overdueCount = FILINGS.filter((f) => f.status === "overdue").length
-  const draftCount   = FILINGS.filter((f) => f.status === "draft").length
+  // Filings live in React state so File/Review/Receipt actions can
+  // optimistically flip the row's badge + button without a refresh.
+  const [filings, setFilings] = React.useState<Filing[]>(SEED_FILINGS)
+  const [pendingId, setPendingId] = React.useState<string | null>(null)
+
+  const due       = filings.filter((f) => f.status === "due" || f.status === "overdue").reduce((s, f) => s + f.taxAmount, 0)
+  const filedYtd  = filings.filter((f) => f.status === "filed").reduce((s, f) => s + f.taxAmount, 0)
+  const overdueCount = filings.filter((f) => f.status === "overdue").length
+  const draftCount   = filings.filter((f) => f.status === "draft").length
   const [exporting, setExporting] = React.useState(false)
 
-  const exportRows = FILINGS.map((f) => ({
+  const onFilingAction = async (f: Filing) => {
+    if (f.status === "filed") {
+      toast.success(`Downloaded ${f.id} certificate.`)
+      return
+    }
+    // Optimistic flip → filed, then confirm via toast. If the backend
+    // ever rejects, restore the previous status.
+    setPendingId(f.id)
+    const previous = f.status
+    setFilings((prev) => prev.map((x) => (x.id === f.id ? { ...x, status: "filed", reference: x.reference ?? `FIRS-PENDING-${f.id}` } : x)))
+    try {
+      await new Promise((r) => setTimeout(r, 250))
+      toast.success(`${f.id} marked filed — Pallio will send the receipt.`)
+    } catch {
+      setFilings((prev) => prev.map((x) => (x.id === f.id ? { ...x, status: previous } : x)))
+      toast.error(`Could not mark ${f.id} filed. Try again.`)
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  const exportRows = filings.map((f) => ({
     filing: f.id, kind: f.kind, period: f.period, due: f.due,
     taxable: f.taxable, tax: f.taxAmount, status: f.status, reference: f.reference ?? "",
   }))
@@ -88,7 +114,7 @@ export default function Taxes() {
     >
       <section className="grid gap-3 lg:grid-cols-4">
         <Tile label="Due now"    value={formatPrice(due)}        tone={overdueCount > 0 ? "danger" : "warning"} sub={overdueCount > 0 ? `${overdueCount} overdue · file today` : "next: May 21"} />
-        <Tile label="Filed YTD"  value={formatPrice(filedYtd)}  tone="success" sub={`${FILINGS.filter((f) => f.status === "filed").length} returns`} />
+        <Tile label="Filed YTD"  value={formatPrice(filedYtd)}  tone="success" sub={`${filings.filter((f) => f.status === "filed").length} returns`} />
         <Tile label="Drafts"     value={String(draftCount)}      tone="neutral" sub="awaiting review" />
         <Tile label="Compliance"  value="On track"                tone={overdueCount > 0 ? "warning" : "success"} sub="FIRS + LIRS" />
       </section>
@@ -152,7 +178,7 @@ export default function Taxes() {
             /* Mobile: card per filing — an 8-column table would scroll
                sideways off a phone. Same data, stacked. */
             <ul className="divide-y divide-border border-t border-border">
-              {FILINGS.map((f) => (
+              {filings.map((f) => (
                 <li key={f.id} className="p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -173,9 +199,10 @@ export default function Taxes() {
                     <Button
                       size="sm"
                       variant={f.status === "filed" ? "ghost" : "outline"}
-                      onClick={() => toast.success(f.status === "filed" ? `Downloaded ${f.id} certificate.` : `${f.id} marked filed — Pallio will send the receipt.`)}
+                      disabled={pendingId === f.id}
+                      onClick={() => onFilingAction(f)}
                     >
-                      {f.status === "filed" ? "Receipt" : f.status === "draft" ? "Review" : "File now"}
+                      {pendingId === f.id ? "Filing…" : f.status === "filed" ? "Receipt" : f.status === "draft" ? "Review" : "File now"}
                     </Button>
                   </div>
                 </li>
@@ -197,8 +224,8 @@ export default function Taxes() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {FILINGS.map((f) => (
-                    <tr key={f.id} className="transition-colors hover:bg-accent/30">
+                  {filings.map((f) => (
+                    <tr key={f.id} className="transition-all duration-150 hover:bg-accent/30">
                       <td className="px-3 py-2.5">
                         <p className="font-mono text-xs font-bold">{f.id}</p>
                         {f.reference && <p className="text-[10px] text-muted-foreground">Ref · <span className="font-mono">{f.reference}</span></p>}
@@ -215,9 +242,10 @@ export default function Taxes() {
                         <Button
                           size="sm"
                           variant={f.status === "filed" ? "ghost" : "outline"}
-                          onClick={() => toast.success(f.status === "filed" ? `Downloaded ${f.id} certificate.` : `${f.id} marked filed — Pallio will send the receipt.`)}
+                          disabled={pendingId === f.id}
+                          onClick={() => onFilingAction(f)}
                         >
-                          {f.status === "filed" ? "Receipt" : f.status === "draft" ? "Review" : "File now"}
+                          {pendingId === f.id ? "Filing…" : f.status === "filed" ? "Receipt" : f.status === "draft" ? "Review" : "File now"}
                         </Button>
                       </td>
                     </tr>

@@ -100,6 +100,8 @@ export default function Reconciliation() {
   const [filter, setFilter] = React.useState<Filter>("all")
   const [query, setQuery] = React.useState("")
   const [selectedPair, setSelectedPair] = React.useState<{ bank?: string; pallio?: string }>({})
+  const [markingRec, setMarkingRec] = React.useState(false)
+  const [recLocked, setRecLocked] = React.useState(false)
 
   const bankLines   = LINES.filter((l) => l.side === "bank")
   const palioLines  = LINES.filter((l) => l.side === "pallio")
@@ -169,8 +171,27 @@ export default function Reconciliation() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" onClick={() => toast.success(`Reconciliation finalised for ${ACCOUNT.statementPeriod}.`)}>
-                <CheckCircle2 className="h-3.5 w-3.5" /> Mark reconciled
+              <Button
+                size="sm"
+                disabled={markingRec || recLocked}
+                title={recLocked ? `Reconciled through ${ACCOUNT.statementPeriod}. Locked until next period.` : undefined}
+                onClick={async () => {
+                  setMarkingRec(true)
+                  try {
+                    await new Promise((r) => setTimeout(r, 350))
+                    setRecLocked(true)
+                    toast.success(`Reconciliation finalised for ${ACCOUNT.statementPeriod}.`, {
+                      description: "Entries are now locked. Next reconciliation due Jun 30, 2026.",
+                    })
+                  } catch {
+                    toast.error("Could not finalise reconciliation. Try again.")
+                  } finally {
+                    setMarkingRec(false)
+                  }
+                }}
+              >
+                <CheckCircle2 className={cn("h-3.5 w-3.5", markingRec && "animate-pulse")} />{" "}
+                {markingRec ? "Marking…" : recLocked ? "Reconciled · locked" : "Mark reconciled"}
               </Button>
             </div>
           </div>
@@ -255,7 +276,13 @@ export default function Reconciliation() {
           </p>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={() => setSelectedPair({})}>Clear</Button>
-            <Button size="sm" onClick={proposeMatch} disabled={!selectedPair.bank || !selectedPair.pallio}>
+            <Button
+              size="sm"
+              onClick={proposeMatch}
+              disabled={!selectedPair.bank || !selectedPair.pallio}
+              title={(!selectedPair.bank || !selectedPair.pallio) ? "Select one bank line and one Pallio entry to confirm match" : undefined}
+              aria-label={(!selectedPair.bank || !selectedPair.pallio) ? "Select one bank line and one Pallio entry to confirm match" : undefined}
+            >
               <Check className="h-3.5 w-3.5" /> Confirm match
             </Button>
           </div>
@@ -458,6 +485,7 @@ function LedgerReconcilePanel() {
   const { formatPrice } = useCurrency()
   const [version, setVersion] = React.useState(0)
   const [stmt, setStmt] = React.useState("")
+  const [saving, setSaving] = React.useState(false)
   React.useEffect(() => { seedExampleLedger() }, [])
   const lines = React.useMemo(() => bankLedgerLines("1010"), [version])
   const summary = React.useMemo(() => reconSummary("1010"), [version])
@@ -488,9 +516,23 @@ function LedgerReconcilePanel() {
             </label>
             <Button
               size="sm"
-              onClick={() => { setReconciledThrough(new Date().toISOString().slice(0, 10)); setVersion((v) => v + 1) }}
+              disabled={saving}
+              onClick={async () => {
+                setSaving(true)
+                try {
+                  await new Promise((r) => setTimeout(r, 300))
+                  const today = new Date().toISOString().slice(0, 10)
+                  setReconciledThrough(today)
+                  setVersion((v) => v + 1)
+                  toast.success(`Reconciled through ${today}.`, { description: "Cleared entries are now locked." })
+                } catch {
+                  toast.error("Could not save reconciliation. Try again.")
+                } finally {
+                  setSaving(false)
+                }
+              }}
             >
-              Mark reconciled
+              {saving ? "Saving…" : "Mark reconciled"}
             </Button>
           </div>
         </div>

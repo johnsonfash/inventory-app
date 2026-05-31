@@ -1,4 +1,5 @@
 import * as React from "react"
+import { toast } from "sonner"
 import { Banknote, Building2, ClipboardList, CreditCard, Scale, TrendingUp, Wallet } from "lucide-react"
 import { ReportShell } from "@/components/reports/report-shell"
 import { KpiBand } from "@/components/reports/kpi-band"
@@ -153,7 +154,20 @@ function Block({
           <li key={r.name} className="flex items-start justify-between gap-3 px-4 py-3">
             <div className="min-w-0">
               <p className="truncate text-sm">{r.name}</p>
-              <p className="truncate text-[11px] text-muted-foreground">{r.sub}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(r.sub).then(
+                    () => toast.success(`Copied account code ${r.sub}`),
+                    () => toast.error("Could not copy code"),
+                  )
+                }}
+                title="Copy account code"
+                aria-label={`Copy account code ${r.sub}`}
+                className="truncate text-left font-mono text-[11px] text-muted-foreground hover:text-brand hover:underline dark:hover:text-primary"
+              >
+                {r.sub}
+              </button>
             </div>
             <p className="shrink-0 text-sm font-semibold tabular-nums">{formatPrice(r.amount)}</p>
           </li>

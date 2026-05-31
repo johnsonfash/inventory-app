@@ -240,10 +240,23 @@ export default function CommissionsPayout() {
               <Button size="sm" variant="ghost" onClick={() => setRulesOpen(true)}>
                 <SlidersHorizontal className="h-3.5 w-3.5" /> Rules
               </Button>
-              <Button size="sm" variant="outline" disabled={pending.length === 0} onClick={() => approve(selectedIds)}>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pending.length === 0}
+                onClick={() => approve(selectedIds)}
+                title={pending.length === 0 ? "No pending commissions to approve" : undefined}
+                aria-label={pending.length === 0 ? "No pending commissions to approve" : undefined}
+              >
                 <CheckSquare className="h-3.5 w-3.5" /> Approve {selectedIds.size > 0 ? `${selectedIds.size} selected` : `all pending (${pending.length})`}
               </Button>
-              <Button size="sm" disabled={approved.length === 0} onClick={() => pay(selectedIds)}>
+              <Button
+                size="sm"
+                disabled={approved.length === 0}
+                onClick={() => pay(selectedIds)}
+                title={approved.length === 0 ? "No approved commissions to pay" : undefined}
+                aria-label={approved.length === 0 ? "No approved commissions to pay" : undefined}
+              >
                 <Send className="h-3.5 w-3.5" /> Pay {approved.length} approved
               </Button>
             </div>
@@ -341,7 +354,7 @@ export default function CommissionsPayout() {
                     const isSelected = selectedIds.has(e.id)
                     const canSelect = e.state === "pending" || e.state === "approved"
                     return (
-                      <tr key={e.id} className={cn("transition-colors hover:bg-accent/30", isSelected && "bg-brand-soft/30 dark:bg-primary/10")}>
+                      <tr key={e.id} className={cn("transition-all duration-150 hover:bg-accent/30", isSelected && "bg-brand-soft/30 dark:bg-primary/10")}>
                         <td className="px-3 py-2.5">
                           <input
                             type="checkbox"

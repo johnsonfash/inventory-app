@@ -139,7 +139,7 @@ export default function CashFlow() {
         {[
           { Icon: FileText, label: "Profit & Loss",  body: "Accrual income statement.",        href: "/accounting/profit-loss" },
           { Icon: Wallet,   label: "Balance sheet",  body: "Assets, liabilities, equity.",     href: "/accounting/balance-sheet" },
-          { Icon: ArrowUpRight, label: "Bank reconciliation", body: "Match Pallio to your bank statement.", href: "/accounting/reconciliation" },
+          { Icon: ArrowUpRight, label: "Bank Reconciliation", body: "Match Pallio to your bank statement.", href: "/accounting/reconciliation" },
         ].map((q) => (
           <Link key={q.label} to={q.href} className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:border-brand/40 hover:bg-accent/40">
             <q.Icon className="h-4 w-4 text-brand dark:text-primary" />

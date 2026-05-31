@@ -519,7 +519,14 @@ function ManualEntryForm({ onDone, onCancel }: { onDone: () => void; onCancel: (
 
       <div className="mt-4 flex justify-end gap-2">
         <Button variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button onClick={post} disabled={!canPost}>Post entry</Button>
+        <Button
+          onClick={post}
+          disabled={!canPost}
+          title={!canPost ? (balanced ? "Add a memo to post" : "Cannot post: entry not balanced") : undefined}
+          aria-label={!canPost ? (balanced ? "Cannot post: memo required" : "Cannot post: entry not balanced") : undefined}
+        >
+          Post entry
+        </Button>
       </div>
     </div>
   )
