@@ -19,7 +19,14 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
-export type SubItem = { title: string; url: string }
+/**
+ * A sub-item may opt into a runtime badge (e.g. count of new items).
+ * `badgeKey` is a stable id the sidebar resolves to a count via
+ * `getNavBadge()`. Kept off the bare data type so static imports of
+ * NAV stay free of runtime dependencies — the resolver lives in
+ * `lib/nav-badges.ts`.
+ */
+export type SubItem = { title: string; url: string; badgeKey?: string }
 export type NavItem = { title: string; url?: string; icon: LucideIcon; sub?: SubItem[] }
 
 // ----- Single source of truth for the full app navigation -----
@@ -73,6 +80,7 @@ export const NAV: NavItem[] = [
     icon: ShoppingCart,
     sub: [
       { title: "Customers", url: "/sales/customers" },
+      { title: "Tickets", url: "/customers/tickets", badgeKey: "tickets:new" },
       { title: "Orders", url: "/sales/orders" },
       { title: "Invoices", url: "/sales/invoices" },
       { title: "Receipts", url: "/sales/receipts" },
@@ -82,6 +90,7 @@ export const NAV: NavItem[] = [
       { title: "Team Performance", url: "/sales/team" },
       { title: "Live Stock", url: "/sales/inventory" },
       { title: "New Customer", url: "/sales/customers/new" },
+      { title: "New Ticket", url: "/customers/tickets/new" },
       { title: "New Order", url: "/sales/orders/new" },
       { title: "New Invoice", url: "/sales/invoices/new" },
       { title: "New Shipment", url: "/sales/shipments/new" },
