@@ -57,7 +57,7 @@ const TONE: Record<Notification["kind"], string> = {
 // ('/notifications?limit=5') when the backend ships.
 const NOTIFICATIONS: Notification[] = [
   { id: "n-1", kind: "stock",    title: "USB‑C Hub crossed reorder threshold", body: "18 units left, ~4 days at current pace.", ago: "12m", unread: true, href: "/inventory" },
-  { id: "n-2", kind: "sale",     title: "Mia closed a ₦86,000 sale",            body: "INV-2174 · Aisha N. · paid via card.",     ago: "38m", unread: true, href: "/sales/invoices/inv-2401" },
+  { id: "n-2", kind: "sale",     title: "Mia closed a ₦86,000 sale",            body: "INV-2401 · Aisha N. · paid via card.",     ago: "38m", unread: true, href: "/sales/invoices/inv-2401" },
   { id: "n-3", kind: "campaign", title: "IG Reels ROAS hit 4.2×",              body: "Holiday Tee Reel is the top performer.",   ago: "1h",                href: "/marketing/instagram-ads" },
   { id: "n-4", kind: "team",     title: "Sara Quill is now an affiliate",       body: "Code QUILL10 issued · 10% commission.",   ago: "2h",  unread: true, href: "/settings/users" },
   { id: "n-5", kind: "alert",    title: "Cobalt: 2 days late on PO‑1042",      body: "3 of last 4 POs from this vendor missed ETA.", ago: "5h",          href: "/purchasing/vendors" },

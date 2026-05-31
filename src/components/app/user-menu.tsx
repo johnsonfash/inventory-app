@@ -2,12 +2,14 @@ import * as React from "react"
 import { createPortal } from "react-dom"
 import { Link, useNavigate } from "react-router-dom"
 import { AnimatePresence, motion } from "framer-motion"
+import { toast } from "sonner"
 import {
   ArrowRight,
   Bell,
   Bot,
   HelpCircle,
   LifeBuoy,
+  Loader2,
   Lock,
   LogOut,
   Settings,
@@ -88,11 +90,21 @@ export function UserMenu() {
     setOpen(true)
   }
 
+  const [signingOut, setSigningOut] = React.useState(false)
+
   const signOut = async () => {
-    await clearAuth()
-    setConfirmOpen(false)
-    setOpen(false)
-    navigate("/")
+    if (signingOut) return
+    setSigningOut(true)
+    try {
+      await clearAuth()
+      setConfirmOpen(false)
+      setOpen(false)
+      navigate("/")
+    } catch {
+      toast.error("Failed to sign out. Please try again.")
+    } finally {
+      setSigningOut(false)
+    }
   }
 
   const ITEMS = [
@@ -239,7 +251,7 @@ export function UserMenu() {
         )
       )}
 
-      <SignOutConfirm open={confirmOpen} onClose={() => setConfirmOpen(false)} onConfirm={signOut} userName={CURRENT_USER.name} />
+      <SignOutConfirm open={confirmOpen} onClose={() => setConfirmOpen(false)} onConfirm={signOut} userName={CURRENT_USER.name} loading={signingOut} />
 
       {/* Unused-import suppression — Sun is reserved for the future "set theme to system from sunlight" telemetry idea. */}
       <span className="hidden"><Sun /></span>
@@ -254,11 +266,13 @@ function SignOutConfirm({
   onClose,
   onConfirm,
   userName,
+  loading,
 }: {
   open: boolean
   onClose: () => void
   onConfirm: () => void
   userName: string
+  loading?: boolean
 }) {
   React.useEffect(() => {
     if (!open) return
@@ -309,9 +323,17 @@ function SignOutConfirm({
             </div>
 
             <div className="flex items-center justify-end gap-2 px-5 py-3">
-              <Button variant="ghost" onClick={onClose}>Stay signed in</Button>
-              <Button onClick={onConfirm} className="bg-rose-600 text-white hover:bg-rose-600/90 dark:bg-rose-700 dark:hover:bg-rose-700/90">
-                <LogOut className="h-3.5 w-3.5" /> Sign out
+              <Button variant="ghost" onClick={onClose} disabled={loading}>Stay signed in</Button>
+              <Button onClick={onConfirm} disabled={loading} aria-busy={loading} className="bg-rose-600 text-white hover:bg-rose-600/90 dark:bg-rose-700 dark:hover:bg-rose-700/90">
+                {loading ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Signing out
+                  </>
+                ) : (
+                  <>
+                    <LogOut className="h-3.5 w-3.5" /> Sign out
+                  </>
+                )}
               </Button>
             </div>
           </motion.div>

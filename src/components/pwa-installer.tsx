@@ -1,6 +1,6 @@
 import * as React from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Download, RefreshCw, X } from "lucide-react"
+import { Download, Loader2, RefreshCw, X } from "lucide-react"
 import { useRegisterSW } from "virtual:pwa-register/react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -27,6 +27,19 @@ export function PWAInstaller() {
 
   // ----- Update toast state -----
   const [showUpdate, setShowUpdate] = needRefresh
+  const [refreshing, setRefreshing] = React.useState(false)
+
+  const handleRefresh = async () => {
+    if (refreshing) return
+    setRefreshing(true)
+    try {
+      await updateServiceWorker(true)
+    } catch {
+      // updateServiceWorker triggers a navigation; if it returns/throws,
+      // drop the busy state so the user can retry.
+      setRefreshing(false)
+    }
+  }
 
   // ----- Install prompt state (beforeinstallprompt) -----
   const [installEvent, setInstallEvent] = React.useState<BeforeInstallPromptEvent | null>(null)
@@ -99,11 +112,17 @@ export function PWAInstaller() {
                 <p className="text-sm font-semibold">Update available</p>
                 <p className="text-[11px] text-muted-foreground">Refresh to get the latest Pallio.</p>
               </div>
-              <Button size="sm" variant="ghost" onClick={() => setShowUpdate(false)}>
+              <Button size="sm" variant="ghost" onClick={() => setShowUpdate(false)} disabled={refreshing}>
                 Later
               </Button>
-              <Button size="sm" onClick={() => updateServiceWorker(true)}>
-                Refresh
+              <Button size="sm" onClick={handleRefresh} disabled={refreshing} aria-busy={refreshing}>
+                {refreshing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Refreshing
+                  </>
+                ) : (
+                  "Refresh"
+                )}
               </Button>
             </div>
           ) : (
