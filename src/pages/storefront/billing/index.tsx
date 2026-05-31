@@ -137,6 +137,45 @@ export default function StorefrontBilling() {
 
   const totalPaid = INVOICES.filter((i) => i.status === "paid").reduce((s, i) => s + i.amount, 0)
 
+  const downloadBlob = (filename: string, body: string, mime: string) => {
+    try {
+      const blob = new Blob([body], { type: mime })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const downloadInvoice = (inv: Invoice) => {
+    const lines = [
+      `Pallio · Invoice ${inv.id}`,
+      `Date: ${inv.date}`,
+      `Description: ${inv.description}`,
+      `Amount: ${formatPrice(inv.amount)}`,
+      `Status: ${inv.status}`,
+    ].join("\n")
+    const ok = downloadBlob(`${inv.id}.txt`, lines, "text/plain;charset=utf-8")
+    if (ok) toast.success(`Downloaded ${inv.id}.txt`)
+    else toast.error("Couldn't start the download.")
+  }
+
+  const exportAllInvoices = () => {
+    const header = "Invoice,Date,Description,Amount,Status"
+    const rows = INVOICES.map((i) => `${i.id},${i.date},"${i.description.replace(/"/g, '""')}",${i.amount},${i.status}`)
+    const csv = [header, ...rows].join("\n")
+    const ok = downloadBlob(`pallio-invoices-${new Date().toISOString().slice(0, 10)}.csv`, csv, "text/csv;charset=utf-8")
+    if (ok) toast.success(`Exported ${INVOICES.length} invoices · check your downloads.`)
+    else toast.error("Couldn't start the export.")
+  }
+
   if (!template) {
     return (
       <PageShell
@@ -199,11 +238,11 @@ export default function StorefrontBilling() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {currentTier !== "premium" && (
-                <Button size="sm" onClick={() => toast.success("Upgrade flow arrives with the backend.")}>
+                <Button size="sm" disabled title="Plan upgrades go live once billing is connected to Paystack.">
                   <Zap className="h-3.5 w-3.5" /> Upgrade
                 </Button>
               )}
-              <Button size="sm" variant="outline" onClick={() => toast("Pause subscription arrives with the backend.")}>
+              <Button size="sm" variant="outline" disabled title="Pausing a subscription needs the billing backend — coming soon.">
                 <Pause className="h-3.5 w-3.5" /> Pause
               </Button>
             </div>
@@ -228,7 +267,7 @@ export default function StorefrontBilling() {
                 <h3 className="text-sm font-semibold md:text-base">Payment method</h3>
                 <div className="flex items-center gap-2">
                   <ConnectionChip providerId="paystack" />
-                  <Button size="sm" variant="ghost" onClick={() => toast("Card update arrives with the backend.")}>
+                  <Button size="sm" variant="ghost" disabled title="Card management opens once we connect to your payment provider's hosted update flow.">
                     Update card →
                   </Button>
                 </div>
@@ -294,8 +333,8 @@ export default function StorefrontBilling() {
         </div>
 
         {/* Invoice history */}
-        <FormSection title="Invoice history" description="12 months · downloadable as PDF for your accountant." Icon={Receipt} trailing={
-          <Button size="sm" variant="outline" onClick={() => toast.success("Receipts exported · check your downloads.")}>
+        <FormSection title="Invoice history" description="12 months · downloadable as CSV for your accountant." Icon={Receipt} trailing={
+          <Button size="sm" variant="outline" onClick={exportAllInvoices}>
             <Download className="h-3.5 w-3.5" /> Export all
           </Button>
         }>
@@ -305,7 +344,7 @@ export default function StorefrontBilling() {
                 <li key={inv.id}>
                   <button
                     type="button"
-                    onClick={() => toast.success(`Downloaded ${inv.id}.pdf`)}
+                    onClick={() => downloadInvoice(inv)}
                     className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-brand/40"
                   >
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand dark:bg-primary/15 dark:text-primary">
@@ -348,7 +387,7 @@ export default function StorefrontBilling() {
                       <td className="px-3 py-2.5 text-right text-xs font-bold tabular-nums">{formatPrice(inv.amount)}</td>
                       <td className="px-3 py-2.5"><StatusBadge tone={STATUS_TONE[inv.status]}>{inv.status}</StatusBadge></td>
                       <td className="px-3 py-2.5 text-right">
-                        <Button size="sm" variant="ghost" onClick={() => toast.success(`Downloaded ${inv.id}.pdf`)}>
+                        <Button size="sm" variant="ghost" onClick={() => downloadInvoice(inv)}>
                           <Download className="h-3.5 w-3.5" />
                         </Button>
                       </td>
@@ -402,8 +441,8 @@ export default function StorefrontBilling() {
                     size="sm"
                     variant={isCurrent ? "outline" : "default"}
                     className={cn("mt-5 w-full", isCurrent && "cursor-default")}
-                    disabled={isCurrent}
-                    onClick={() => toast.success(isDowngrade ? `Downgrade to ${tier} scheduled for ${nextBillingLabel}.` : `Upgraded to ${tier} — first charge on ${nextBillingLabel}.`)}
+                    disabled
+                    title={isCurrent ? "This is your current plan." : "Plan changes go live once billing is connected to Paystack."}
                   >
                     {isCurrent ? "Current plan" : isDowngrade ? "Downgrade" : features.cta}
                   </Button>
@@ -432,7 +471,12 @@ export default function StorefrontBilling() {
                     <p className="truncate text-[11px] text-muted-foreground">{a.sub}</p>
                     <p className="mt-0.5 text-xs font-bold tabular-nums">{a.price}</p>
                   </div>
-                  <Button size="sm" variant={a.active ? "outline" : "default"} onClick={() => toast.success(a.active ? `${a.name} cancelled — refund prorated.` : `${a.name} added — first charge ${nextBillingLabel}.`)}>
+                  <Button
+                    size="sm"
+                    variant={a.active ? "outline" : "default"}
+                    disabled
+                    title={a.active ? "Add-on cancellation needs the billing backend — coming soon." : "Add-on purchases go live once billing is connected to Paystack."}
+                  >
                     {a.active ? "Cancel" : "Add"}
                   </Button>
                 </div>
@@ -453,8 +497,8 @@ export default function StorefrontBilling() {
                 </div>
               </div>
               <div className="flex w-full max-w-sm gap-2 sm:w-auto">
-                <Input placeholder="LAUNCH50" className="font-mono" />
-                <Button size="sm" onClick={() => toast.success("Promo applied — next invoice reflects the discount.")}>
+                <Input placeholder="LAUNCH50" className="font-mono" disabled />
+                <Button size="sm" disabled title="Promo code validation happens server-side — coming once billing is wired up.">
                   Apply
                 </Button>
               </div>
@@ -474,7 +518,13 @@ export default function StorefrontBilling() {
                 </p>
               </div>
             </div>
-            <Button size="sm" variant="outline" className="border-rose-500/40 text-rose-600 dark:text-rose-400" onClick={() => toast.success("Cancellation scheduled — you can undo from this page any time before " + nextBillingLabel + ".")}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-rose-500/40 text-rose-600 dark:text-rose-400"
+              disabled
+              title="Subscription cancellation needs the billing backend — coming soon."
+            >
               <X className="h-3.5 w-3.5" /> Cancel subscription
             </Button>
           </div>

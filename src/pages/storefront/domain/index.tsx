@@ -50,6 +50,9 @@ const STEPS: DnsStep[] = [
 export default function StorefrontDomain() {
   useRegisterPageRefresh(React.useCallback(async () => { await new Promise((r) => setTimeout(r, 250)) }, []))
   const [state, setStateLocal] = React.useState<StorefrontState>(() => getStorefrontState())
+  // Draft input for the not-yet-saved custom domain. We only persist
+  // to state.customDomain on Add click so the Add button isn't dead.
+  const [domainDraft, setDomainDraft] = React.useState("")
   // Mocked DNS / SSL status — real backend will poll & update.
   const [dnsStatus, setDnsStatus] = React.useState<"pending" | "verified" | "error">(state.customDomain ? "verified" : "pending")
   const [sslStatus, setSslStatus] = React.useState<"pending" | "active" | "error">(state.customDomain ? "active" : "pending")
@@ -211,17 +214,24 @@ export default function StorefrontDomain() {
 
                 <div className="mt-3 flex gap-2">
                   <Input
-                    value={state.customDomain ?? ""}
-                    onChange={(e) => update({ customDomain: e.target.value.trim() || null })}
+                    value={state.customDomain ?? domainDraft}
+                    onChange={(e) => {
+                      const next = e.target.value.trim()
+                      if (state.customDomain) update({ customDomain: next || null })
+                      else setDomainDraft(next)
+                    }}
                     placeholder="shop.yourdomain.com"
                     className="flex-1 font-mono"
                   />
                   {state.customDomain ? (
-                    <Button variant="outline" onClick={() => { update({ customDomain: null }); setDnsStatus("pending"); setSslStatus("pending"); toast.success("Custom domain removed.") }}>
+                    <Button variant="outline" onClick={() => { update({ customDomain: null }); setDomainDraft(""); setDnsStatus("pending"); setSslStatus("pending"); toast.success("Custom domain removed.") }}>
                       Remove
                     </Button>
                   ) : (
-                    <Button onClick={() => toast.success("Domain added — set up DNS below.")} disabled={!state.customDomain}>
+                    <Button
+                      onClick={() => { update({ customDomain: domainDraft }); setDnsStatus("pending"); setSslStatus("pending"); toast.success("Domain added — set up DNS below.") }}
+                      disabled={!domainDraft}
+                    >
                       Add
                     </Button>
                   )}
