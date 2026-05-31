@@ -25,6 +25,7 @@ export default function WebhooksSettings() {
   const [addOpen, setAddOpen] = React.useState(false)
   const [url, setUrl] = React.useState("")
   const [events, setEvents] = React.useState<string[]>([])
+  const [pendingToggle, setPendingToggle] = React.useState<string | null>(null)
 
   const toggleEvent = (e: string) => setEvents((prev) => (prev.includes(e) ? prev.filter((x) => x !== e) : [...prev, e]))
 
@@ -34,7 +35,22 @@ export default function WebhooksSettings() {
     toast.success("Endpoint added", { description: url.trim() })
     setUrl(""); setEvents([]); setAddOpen(false)
   }
-  const toggleActive = (id: string) => setRows((prev) => prev.map((r) => (r.id === id ? { ...r, active: !r.active } : r)))
+  const toggleActive = async (id: string) => {
+    setPendingToggle(id)
+    const target = rows.find((r) => r.id === id)
+    const nextActive = !target?.active
+    // Optimistic update — flip first, roll back on failure.
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, active: !r.active } : r)))
+    try {
+      await new Promise((r) => setTimeout(r, 400))
+      toast.success(nextActive ? "Endpoint resumed" : "Endpoint paused", { description: target?.url })
+    } catch {
+      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, active: !r.active } : r)))
+      toast.error("Couldn't update endpoint", { description: "Try again in a moment." })
+    } finally {
+      setPendingToggle(null)
+    }
+  }
   const remove = (r: Endpoint) => {
     setRows((prev) => prev.filter((x) => x.id !== r.id))
     toast(`Endpoint removed`, { description: r.url, action: { label: "Undo", onClick: () => setRows((prev) => [r, ...prev]) } })
@@ -76,7 +92,7 @@ export default function WebhooksSettings() {
                   <p className="mt-1 text-[10px] text-muted-foreground">Last delivery: {r.lastDelivery}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  <Button size="sm" variant="ghost" onClick={() => toggleActive(r.id)}>{r.active ? "Pause" : "Resume"}</Button>
+                  <Button size="sm" variant="ghost" onClick={() => toggleActive(r.id)} disabled={pendingToggle === r.id}>{pendingToggle === r.id ? "Saving…" : r.active ? "Pause" : "Resume"}</Button>
                   <Button size="sm" variant="ghost" onClick={() => remove(r)} aria-label="Delete endpoint" className="text-rose-600 hover:bg-rose-500/10 dark:text-rose-400">
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>

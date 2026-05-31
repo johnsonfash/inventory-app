@@ -1,4 +1,6 @@
 import * as React from "react"
+import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import { Banknote, Building2, ShieldCheck } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -14,6 +16,21 @@ import { useCurrency, formatPriceFor } from "@/contexts/currency"
 export default function NewWithdrawalAccount() {
   const [submitting, setSubmitting] = React.useState(false)
   const { formatPrice } = useCurrency()
+  const navigate = useNavigate()
+
+  const onSubmit = async () => {
+    setSubmitting(true)
+    try {
+      // Simulated save — when backend lands, replace with api.post(...)
+      await new Promise((r) => setTimeout(r, 500))
+      toast.success("Payout account added", { description: "We'll send a small test deposit to verify it." })
+      navigate("/settings/payments/accounts")
+    } catch {
+      toast.error("Couldn't add account", { description: "Check the bank details and try again." })
+    } finally {
+      setSubmitting(false)
+    }
+  }
   return (
     <FormShell
       title="New withdrawal account"
@@ -27,7 +44,7 @@ export default function NewWithdrawalAccount() {
         </>
       }
       backHref="/settings/payments/accounts"
-      onSubmit={() => { setSubmitting(true); setTimeout(() => setSubmitting(false), 500) }}
+      onSubmit={onSubmit}
       aside={
         <FormAside
           tips={[

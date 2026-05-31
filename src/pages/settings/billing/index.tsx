@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Link } from "react-router-dom"
 import { toast } from "sonner"
-import { ArrowRight, Check, CreditCard, Download, Sparkles, Zap } from "lucide-react"
+import { ArrowRight, Check, CreditCard, Download, Loader2, Sparkles, Zap } from "lucide-react"
 import { PageShell } from "@/components/page-shell"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -33,6 +33,32 @@ export default function BillingSettings() {
   useRegisterPageRefresh(React.useCallback(async () => { await new Promise((r) => setTimeout(r, 350)) }, []))
   const remaining = Math.max(0, CREDITS.included - CREDITS.used)
   const pct = Math.min(100, Math.round((CREDITS.used / CREDITS.included) * 100))
+  const [pendingPack, setPendingPack] = React.useState<string | null>(null)
+  const [pendingInvoice, setPendingInvoice] = React.useState<string | null>(null)
+
+  const buyPack = async (credits: string, price: string) => {
+    setPendingPack(credits)
+    try {
+      await new Promise((r) => setTimeout(r, 700))
+      toast.success(`${credits} credits added`, { description: `${price} charged to your card.` })
+    } catch {
+      toast.error("Couldn't complete purchase", { description: "Try again or check your payment method." })
+    } finally {
+      setPendingPack(null)
+    }
+  }
+
+  const downloadInvoice = async (id: string) => {
+    setPendingInvoice(id)
+    try {
+      await new Promise((r) => setTimeout(r, 600))
+      toast.success(`${id} downloaded`)
+    } catch {
+      toast.error(`Couldn't download ${id}`, { description: "Try again in a moment." })
+    } finally {
+      setPendingInvoice(null)
+    }
+  }
 
   return (
     <PageShell
@@ -61,7 +87,13 @@ export default function BillingSettings() {
               </div>
               <div className="flex gap-2">
                 <Link to="/pricing"><Button variant="outline" size="sm">Change plan</Button></Link>
-                <Button size="sm" variant="ghost" onClick={() => toast("Manage payment method", { description: "Card management lands with the billing backend." })}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled
+                  title="Card management arrives with the billing backend."
+                  aria-label="Manage payment method (coming with billing backend)"
+                >
                   <CreditCard className="h-3.5 w-3.5" /> Card ··· 4242
                 </Button>
               </div>
@@ -89,10 +121,14 @@ export default function BillingSettings() {
                 <button
                   key={p.credits}
                   type="button"
-                  onClick={() => toast.success(`${p.credits} credits added`, { description: `${p.price} charged to your card.` })}
-                  className="flex items-center justify-between rounded-xl border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-brand/40"
+                  onClick={() => buyPack(p.credits, p.price)}
+                  disabled={pendingPack !== null}
+                  className="flex items-center justify-between rounded-xl border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-brand/40 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <span className="text-sm font-semibold">{p.credits} credits</span>
+                  <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
+                    {pendingPack === p.credits && <Loader2 className="h-3 w-3 animate-spin" />}
+                    {p.credits} credits
+                  </span>
                   <span className="text-sm tabular-nums text-brand dark:text-primary">{p.price}</span>
                 </button>
               ))}
@@ -135,8 +171,8 @@ export default function BillingSettings() {
                   <div className="flex items-center gap-3">
                     <span className="text-sm tabular-nums">{inv.amount}</span>
                     <StatusBadge tone="success"><Check className="mr-0.5 inline h-3 w-3" />{inv.status}</StatusBadge>
-                    <Button size="sm" variant="ghost" onClick={() => toast.success(`${inv.id} downloaded`)} aria-label="Download invoice">
-                      <Download className="h-3.5 w-3.5" />
+                    <Button size="sm" variant="ghost" onClick={() => downloadInvoice(inv.id)} disabled={pendingInvoice !== null} aria-label="Download invoice">
+                      {pendingInvoice === inv.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
                     </Button>
                   </div>
                 </li>

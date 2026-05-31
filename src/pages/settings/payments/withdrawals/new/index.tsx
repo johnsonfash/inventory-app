@@ -1,4 +1,6 @@
 import * as React from "react"
+import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import { ArrowDownToLine, Building2, ShieldCheck, Wallet } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -18,6 +20,21 @@ export default function NewWithdrawal() {
   useAutoMarkStep("first-withdrawal")
   const [submitting, setSubmitting] = React.useState(false)
   const { formatPrice, symbol } = useCurrency()
+  const navigate = useNavigate()
+
+  const onSubmit = async () => {
+    setSubmitting(true)
+    try {
+      // Mock latency — when backend lands swap for api.post('/withdrawals', ...).
+      await new Promise((r) => setTimeout(r, 500))
+      toast.success("Withdrawal requested", { description: "We'll email you when funds land." })
+      navigate("/settings/payments/withdrawals")
+    } catch {
+      toast.error("Couldn't request withdrawal", { description: "Check the amount and account, then try again." })
+    } finally {
+      setSubmitting(false)
+    }
+  }
   return (
     <FormShell
       title="New withdrawal"
@@ -30,7 +47,7 @@ export default function NewWithdrawal() {
         </>
       }
       backHref="/settings/payments/withdrawals"
-      onSubmit={() => { setSubmitting(true); setTimeout(() => setSubmitting(false), 500) }}
+      onSubmit={onSubmit}
       aside={
         <FormAside
           tips={[

@@ -1,7 +1,11 @@
+import * as React from "react"
+import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 import { CreditCard, KeyRound, Webhook } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { FormSection } from "@/components/forms/form-section"
 import { FormGrid } from "@/components/forms/form-grid"
 import { FormField } from "@/components/forms/form-field"
@@ -9,7 +13,40 @@ import { SwitchField } from "@/components/forms/switch-field"
 import { IntegrationShell } from "@/components/settings/integration-shell"
 
 export default function StripeConfig() {
+  const [confirmDisconnect, setConfirmDisconnect] = React.useState(false)
+  const [disconnecting, setDisconnecting] = React.useState(false)
+  const [saving, setSaving] = React.useState(false)
+  const navigate = useNavigate()
+
+  const onDisconnect = async () => {
+    setDisconnecting(true)
+    try {
+      // Mock latency — when backend lands, replace with api.delete('/integrations/stripe').
+      await new Promise((r) => setTimeout(r, 500))
+      toast.success("Stripe disconnected", { description: "Card payments are paused until you reconnect." })
+      setConfirmDisconnect(false)
+      navigate("/settings/integrations")
+    } catch {
+      toast.error("Couldn't disconnect", { description: "Try again in a moment." })
+    } finally {
+      setDisconnecting(false)
+    }
+  }
+
+  const onSave = async () => {
+    setSaving(true)
+    try {
+      await new Promise((r) => setTimeout(r, 500))
+      toast.success("Stripe settings saved")
+    } catch {
+      toast.error("Couldn't save changes", { description: "Check the keys and try again." })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
+    <>
     <IntegrationShell
       name="Stripe"
       category="Payments"
@@ -21,8 +58,8 @@ export default function StripeConfig() {
       docsHref="https://docs.stripe.com"
       footer={
         <div className="flex items-center justify-between gap-2">
-          <Button type="button" variant="outline">Disconnect</Button>
-          <Button type="button">Save changes</Button>
+          <Button type="button" variant="outline" onClick={() => setConfirmDisconnect(true)} disabled={disconnecting || saving}>Disconnect</Button>
+          <Button type="button" onClick={onSave} disabled={saving || disconnecting}>{saving ? "Saving…" : "Save changes"}</Button>
         </div>
       }
     >
@@ -76,5 +113,22 @@ export default function StripeConfig() {
         </div>
       </FormSection>
     </IntegrationShell>
+    <Dialog open={confirmDisconnect} onOpenChange={(v) => { if (!v && !disconnecting) setConfirmDisconnect(false) }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Disconnect Stripe?</DialogTitle>
+          <DialogDescription>
+            Card payments through Stripe (Visa, Mastercard, Amex, Apple Pay, Google Pay) will stop until you reconnect. In-flight payouts continue.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setConfirmDisconnect(false)} disabled={disconnecting}>Cancel</Button>
+          <Button onClick={onDisconnect} disabled={disconnecting} className="bg-rose-600 text-white hover:bg-rose-700">
+            {disconnecting ? "Disconnecting…" : "Disconnect Stripe"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }

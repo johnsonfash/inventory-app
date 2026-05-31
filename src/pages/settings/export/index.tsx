@@ -1,6 +1,6 @@
 import * as React from "react"
 import { toast } from "sonner"
-import { Boxes, Download, FileText, Package, Receipt, ShoppingCart, Truck, Users } from "lucide-react"
+import { Boxes, Download, FileText, Loader2, Package, Receipt, ShoppingCart, Truck, Users } from "lucide-react"
 import { PageShell } from "@/components/page-shell"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -20,9 +20,20 @@ const DATASETS: Dataset[] = [
 export default function DataExportSettings() {
   useRegisterPageRefresh(React.useCallback(async () => { await new Promise((r) => setTimeout(r, 300)) }, []))
   const [format, setFormat] = React.useState<"csv" | "json" | "xlsx">("csv")
+  const [pending, setPending] = React.useState<string | null>(null)
 
-  const download = (label: string) =>
-    toast.success(`Preparing ${label} export`, { description: `A .${format} file will download when ready (mock until backend).` })
+  const download = async (label: string) => {
+    setPending(label)
+    try {
+      // Mock generation latency — real file download lands with the backend.
+      await new Promise((r) => setTimeout(r, 600))
+      toast.success(`${label} export prepared`, { description: `Your .${format} file will download as soon as the backend ships.` })
+    } catch {
+      toast.error(`Couldn't prepare ${label} export`, { description: "Try again in a moment." })
+    } finally {
+      setPending(null)
+    }
+  }
 
   return (
     <PageShell
@@ -45,8 +56,8 @@ export default function DataExportSettings() {
                 ))}
               </div>
             </div>
-            <Button onClick={() => download("full account")}>
-              <Download className="h-4 w-4" /> Export everything
+            <Button onClick={() => download("full account")} disabled={pending !== null}>
+              {pending === "full account" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Export everything
             </Button>
           </CardContent>
         </Card>
@@ -63,8 +74,8 @@ export default function DataExportSettings() {
                   <p className="truncate text-sm font-semibold">{d.label}</p>
                   <p className="text-[11px] text-muted-foreground tabular-nums">{d.rows.toLocaleString()} records</p>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => download(d.label)}>
-                  <Download className="h-3.5 w-3.5" /> Export
+                <Button size="sm" variant="outline" onClick={() => download(d.label)} disabled={pending !== null}>
+                  {pending === d.label ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />} Export
                 </Button>
               </CardContent>
             </Card>

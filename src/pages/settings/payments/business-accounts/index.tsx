@@ -169,6 +169,32 @@ export default function BusinessAccounts() {
     }
   }
 
+  const [pendingId, setPendingId] = React.useState<string | null>(null)
+
+  const makePrimary = async (bank: string, id: string) => {
+    setPendingId(id)
+    try {
+      await new Promise((r) => setTimeout(r, 400))
+      toast.success(`${bank} set as primary receiving account.`)
+    } catch {
+      toast.error("Couldn't set as primary", { description: "Try again in a moment." })
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  const verifyAccount = async (id: string) => {
+    setPendingId(id)
+    try {
+      await new Promise((r) => setTimeout(r, 400))
+      toast.success("Verification email sent to your bank.")
+    } catch {
+      toast.error("Couldn't start verification", { description: "Try again in a moment." })
+    } finally {
+      setPendingId(null)
+    }
+  }
+
   return (
     <PageShell
       title="Receiving Accounts"
@@ -222,7 +248,12 @@ export default function BusinessAccounts() {
                   <Button size="sm" variant="outline" onClick={() => copy(primary.shortNumber.replace(/[^0-9]/g, ""), "Account number")}>
                     <Copy className="h-3.5 w-3.5" /> Copy details
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => toast("Refresh arrives with the backend.")}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled
+                    title="Live balance refresh arrives with the billing backend."
+                  >
                     <RefreshCcw className="h-3.5 w-3.5" /> Refresh
                   </Button>
                 </div>
@@ -238,7 +269,11 @@ export default function BusinessAccounts() {
               <h3 className="text-sm font-semibold md:text-base">All receiving accounts</h3>
               <p className="text-[11px] text-muted-foreground">Customers + processors land funds here. Choose one as primary for invoices + Paystack settlement.</p>
             </div>
-            <Button size="sm" onClick={() => toast("Add account form arrives with the backend.")}>
+            <Button
+              size="sm"
+              disabled
+              title="Add receiving account form arrives with the billing backend."
+            >
               <Plus className="h-3.5 w-3.5" /> Add account
             </Button>
           </div>
@@ -282,16 +317,22 @@ export default function BusinessAccounts() {
                     )}
                     <div className="mt-3 flex gap-1.5">
                       {!a.primary && a.status === "verified" && (
-                        <Button size="sm" variant="outline" className="flex-1" onClick={() => toast.success(`${a.bank} set as primary receiving account.`)}>
-                          <Star className="h-3 w-3" /> Make primary
+                        <Button size="sm" variant="outline" className="flex-1" onClick={() => makePrimary(a.bank, a.id)} disabled={pendingId === a.id}>
+                          <Star className="h-3 w-3" /> {pendingId === a.id ? "Saving…" : "Make primary"}
                         </Button>
                       )}
                       {a.status === "pending" && (
-                        <Button size="sm" className="flex-1" onClick={() => toast.success("Verification email sent to your bank.")}>
-                          <Shield className="h-3 w-3" /> Verify
+                        <Button size="sm" className="flex-1" onClick={() => verifyAccount(a.id)} disabled={pendingId === a.id}>
+                          <Shield className="h-3 w-3" /> {pendingId === a.id ? "Sending…" : "Verify"}
                         </Button>
                       )}
-                      <Button size="sm" variant="ghost" aria-label="Edit" onClick={() => toast("Edit arrives with the backend.")}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label="Edit"
+                        disabled
+                        title="Inline edit arrives with the billing backend."
+                      >
                         <Edit3 className="h-3.5 w-3.5" />
                       </Button>
                     </div>

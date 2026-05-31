@@ -6,6 +6,8 @@ import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import { EmptyState } from "@/components/lists/empty-state"
 import { StatusBadge, type StatusTone } from "@/components/lists/status-badge"
@@ -37,9 +39,30 @@ const statusTone: Record<Row["status"], StatusTone> = {
 export default function PaymentAccounts() {
   const [query, setQuery] = React.useState("")
   const [rows, setRows] = React.useState<Row[]>(SEED_ACCOUNTS)
+  const [editing, setEditing] = React.useState<Row | null>(null)
+  const [editDraft, setEditDraft] = React.useState<Row | null>(null)
+  const [savingEdit, setSavingEdit] = React.useState(false)
   useRegisterPageRefresh(React.useCallback(async () => { await new Promise((r) => setTimeout(r, 400)) }, []))
 
-  const onEdit = (r: Row) => toast(`Edit ${r.bank}`, { description: `${r.accountName} · ${r.accountNumber}` })
+  const onEdit = (r: Row) => {
+    setEditing(r)
+    setEditDraft({ ...r })
+  }
+  const saveEdit = async () => {
+    if (!editDraft) return
+    setSavingEdit(true)
+    try {
+      await new Promise((r) => setTimeout(r, 350))
+      setRows((prev) => prev.map((x) => (x.id === editDraft.id ? editDraft : x)))
+      toast.success(`${editDraft.bank} updated`, { description: editDraft.accountName })
+      setEditing(null)
+      setEditDraft(null)
+    } catch {
+      toast.error("Couldn't save changes", { description: "Try again in a moment." })
+    } finally {
+      setSavingEdit(false)
+    }
+  }
   const onDelete = (r: Row) => {
     setRows((prev) => prev.filter((x) => x.id !== r.id))
     toast(`${r.bank} account removed`, {
@@ -93,7 +116,14 @@ export default function PaymentAccounts() {
 
         {filtered.length === 0 ? (
           <Card><CardContent className="p-0">
-            <EmptyState Icon={Banknote} title="No accounts match" description="Try a different filter or add a new account." />
+            <EmptyState
+              Icon={Banknote}
+              title={query.trim() ? `No accounts match "${query.trim()}"` : "No accounts yet"}
+              description={query.trim() ? "Try a different filter, or clear the search to see every account." : "Add an account to start sending payouts."}
+              action={query.trim() ? (
+                <Button variant="outline" size="sm" onClick={() => setQuery("")}>Clear search</Button>
+              ) : undefined}
+            />
           </CardContent></Card>
         ) : (
           <ul className="space-y-2">
@@ -123,6 +153,48 @@ export default function PaymentAccounts() {
           </ul>
         )}
       </div>
+
+      <Dialog open={!!editing} onOpenChange={(v) => { if (!v) { setEditing(null); setEditDraft(null) } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit payout account</DialogTitle>
+            <DialogDescription>Update the bank details Pallio sends settlement money to.</DialogDescription>
+          </DialogHeader>
+          {editDraft && (
+            <div className="flex flex-col gap-3 py-1">
+              <label className="flex flex-col gap-1.5 text-xs">
+                <span className="font-semibold text-foreground/80">Bank</span>
+                <Input value={editDraft.bank} onChange={(e) => setEditDraft({ ...editDraft, bank: e.target.value })} />
+              </label>
+              <label className="flex flex-col gap-1.5 text-xs">
+                <span className="font-semibold text-foreground/80">Account name</span>
+                <Input value={editDraft.accountName} onChange={(e) => setEditDraft({ ...editDraft, accountName: e.target.value })} />
+              </label>
+              <label className="flex flex-col gap-1.5 text-xs">
+                <span className="font-semibold text-foreground/80">Account number</span>
+                <Input value={editDraft.accountNumber} onChange={(e) => setEditDraft({ ...editDraft, accountNumber: e.target.value })} />
+              </label>
+              <label className="flex flex-col gap-1.5 text-xs">
+                <span className="font-semibold text-foreground/80">Status</span>
+                <Select value={editDraft.status} onValueChange={(v) => setEditDraft({ ...editDraft, status: v as Row["status"] })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="verified">verified</SelectItem>
+                    <SelectItem value="pending">pending</SelectItem>
+                    <SelectItem value="disabled">disabled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </label>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setEditing(null); setEditDraft(null) }} disabled={savingEdit}>Cancel</Button>
+            <Button onClick={saveEdit} disabled={savingEdit || !editDraft?.bank.trim() || !editDraft?.accountName.trim()}>
+              {savingEdit ? "Saving…" : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   )
 }
