@@ -1,28 +1,34 @@
 import * as React from "react"
+import { Link } from "react-router-dom"
 import { AnimatePresence, motion } from "framer-motion"
+import { toast } from "sonner"
 import {
+  ArrowRight,
   ArrowUp,
   Bookmark,
   BookmarkCheck,
   Bot,
-  ClipboardCheck,
+  Coins,
   Copy,
+  Database,
+  HelpCircle,
   Plus,
   RotateCcw,
   Settings2,
   Sparkles,
-  TrendingUp,
   User as UserIcon,
 } from "lucide-react"
 import { PageShell } from "@/components/page-shell"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { aiChat } from "@/lib/api-mocks/ai-chat"
+import { aiChat, type AiChatSource } from "@/lib/api-mocks/ai-chat"
+import { getAiCredits, spendCredit } from "@/lib/ai/credits"
 import { useRegisterPageRefresh } from "@/hooks/use-pull-to-refresh"
 import { useChatKeyboard } from "@/hooks/use-chat-keyboard"
 import { BottomSheet } from "@/components/mobile/bottom-sheet"
 import { SwitchField } from "@/components/forms/switch-field"
 import { useAutoMarkStep } from "@/hooks/use-auto-mark-step"
+import { useTerm } from "@/hooks/use-industry"
 import { cn } from "@/lib/utils"
 
 type Msg = {
@@ -30,16 +36,9 @@ type Msg = {
   role: "user" | "assistant"
   content: string
   pending?: boolean
+  source?: AiChatSource
+  link?: { href: string; label: string }
 }
-
-const SUGGESTIONS = [
-  { label: "Low stock under 10", prompt: "Show low stock items under 10 units", Icon: TrendingUp },
-  { label: "Top trending products", prompt: "Which products are trending this month?", Icon: Sparkles },
-  { label: "Open POs summary", prompt: "Summarize purchase orders received this week", Icon: ClipboardCheck },
-  { label: "Top customers", prompt: "Who are the top customers by revenue?", Icon: UserIcon },
-  { label: "Tax owed this quarter", prompt: "How much tax do I owe this quarter?", Icon: Bookmark },
-  { label: "Margin drift", prompt: "Which categories have the biggest margin change?", Icon: TrendingUp },
-]
 
 let msgIdSeq = 0
 const newId = () => `m-${++msgIdSeq}`
@@ -53,18 +52,43 @@ export default function AIChat() {
   const kb = useChatKeyboard()
   const scrollRef = kb.scrollContainerRef
 
+  // Industry-aware vocabulary for the example chips. Restaurants ask
+  // about "checks", auto workshops about "work orders", salons about
+  // "bookings" — same underlying aggregator, different surface copy.
+  const saleTerm = useTerm("sale", "order")
+  const salesTerm = useTerm("sale.plural", "orders")
+  const customerTerm = useTerm("customer", "customer")
+  const inventoryTerm = useTerm("inventory", "inventory")
+  const itemTerm = useTerm("item.plural", "items")
+
+  const examples = React.useMemo(
+    () => [
+      { label: `${cap(salesTerm)} today`,          prompt: `How many ${salesTerm} today?` },
+      { label: `Revenue this week`,                prompt: `What's revenue this week?` },
+      { label: `Low stock`,                        prompt: `What's low in ${inventoryTerm}?` },
+      { label: `Top ${itemTerm}`,                  prompt: `Top ${itemTerm} this month` },
+      { label: `Tax collected`,                    prompt: `How much tax did we collect this month?` },
+      { label: `${cap(customerTerm)}s on file`,    prompt: `How many ${customerTerm}s do we have?` },
+      { label: `What is a recipe?`,                prompt: `What is a recipe?` },
+      { label: `How do I refund?`,                 prompt: `How do I refund a ${saleTerm}?` },
+    ],
+    [saleTerm, salesTerm, customerTerm, inventoryTerm, itemTerm],
+  )
+
   const [msgs, setMsgs] = React.useState<Msg[]>([
     {
       id: newId(),
       role: "assistant",
       content:
-        "Hi — I'm Pallio AI. Ask me about inventory, sales, purchases, or finance. I have access to your live data within the scope you set on the right.",
+        "Hi — I'm Pallio AI. Ask about your orders, stock, sales, customers, or taxes — or ask me to find a page or feature.",
+      source: "docs",
     },
   ])
   const [text, setText] = React.useState("")
   const [busy, setBusy] = React.useState(false)
   const [saved, setSaved] = React.useState<string[]>([])
   const [settingsOpen, setSettingsOpen] = React.useState(false)
+  const [credits, setCredits] = React.useState(() => getAiCredits())
   const [ctx, setCtx] = React.useState({
     org: "Funke Apparel",
     loc: "Lekki Phase 1",
@@ -101,21 +125,29 @@ export default function AIChat() {
     setMsgs((m) => [...m, userMsg, placeholder])
     setText("")
     setBusy(true)
+    // Deduct first — even if the call fails, the credit was spent. When
+    // the bucket's empty we still answer, but surface the meter hint.
+    const had = spendCredit(1)
+    const next = getAiCredits()
+    setCredits(next)
+    if (!had) {
+      toast.info("You've used all your AI credits this month. Upgrade your plan or wait for the reset — I'll still try to help.")
+    }
     try {
       const data = await aiChat({ prompt: buildPrompt(value), context: ctx })
-      await typeWriter(placeholder.id, String(data.reply ?? ""))
+      await typeWriter(placeholder.id, String(data.reply ?? ""), data.source, data.link)
     } catch {
-      await typeWriter(placeholder.id, "Sorry — the AI provider isn't configured yet. This response is mocked.")
+      await typeWriter(placeholder.id, "Sorry — the AI provider isn't configured yet. This response is mocked.", "unknown")
     } finally {
       setBusy(false)
     }
   }
 
-  async function typeWriter(id: string, full: string) {
+  async function typeWriter(id: string, full: string, source?: AiChatSource, link?: { href: string; label: string }) {
     for (let i = 1; i <= full.length; i++) {
       const chunk = full.slice(0, i)
       await new Promise((r) => setTimeout(r, 5))
-      setMsgs((m) => m.map((msg) => (msg.id === id ? { ...msg, content: chunk, pending: i < full.length } : msg)))
+      setMsgs((m) => m.map((msg) => (msg.id === id ? { ...msg, content: chunk, pending: i < full.length, source, link } : msg)))
     }
   }
 
@@ -130,6 +162,7 @@ export default function AIChat() {
         id: newId(),
         role: "assistant",
         content: "New thread started. What's on your mind?",
+        source: "docs",
       },
     ])
   }
@@ -235,6 +268,18 @@ export default function AIChat() {
                 </span>
               </p>
             </div>
+            <span
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium tabular-nums",
+                credits.remaining === 0
+                  ? "border-warning/40 bg-warning/10 text-warning-foreground"
+                  : "border-border bg-muted/40 text-muted-foreground",
+              )}
+              title="AI credits this month"
+            >
+              <Coins className="h-3 w-3" />
+              {credits.remaining} / {credits.total}
+            </span>
             <Button type="button" variant="ghost" size="icon" onClick={resetThread} className="h-8 w-8" title="New thread">
               <RotateCcw className="h-3.5 w-3.5" />
             </Button>
@@ -272,14 +317,31 @@ export default function AIChat() {
                     ) : m.pending ? (
                       <TypingDots />
                     ) : null}
-                    {m.role === "assistant" && m.content && !m.pending && (
-                      <button
-                        type="button"
-                        onClick={() => navigator.clipboard?.writeText(m.content)}
-                        className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground"
+                    {m.role === "assistant" && m.link && !m.pending && (
+                      <Link
+                        to={m.link.href}
+                        className="mt-2 inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs font-medium text-foreground hover:border-brand/50 hover:bg-accent"
                       >
-                        <Copy className="h-3 w-3" /> Copy
-                      </button>
+                        {m.link.label}
+                        <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    )}
+                    {m.role === "assistant" && m.content && !m.pending && (
+                      <div className="mt-2 flex items-center gap-2">
+                        {m.source && m.source !== "unknown" && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            {m.source === "data" ? <Database className="h-3 w-3" /> : <HelpCircle className="h-3 w-3" />}
+                            Source: {m.source === "data" ? "your data" : "docs"}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard?.writeText(m.content)}
+                          className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground"
+                        >
+                          <Copy className="h-3 w-3" /> Copy
+                        </button>
+                      </div>
                     )}
                   </div>
                   {m.role === "user" && (
@@ -292,30 +354,29 @@ export default function AIChat() {
             </AnimatePresence>
           </div>
 
-          {/* Suggestion chips — one horizontally-scrollable row so it
-              never eats vertical real estate. Containing div clips
-              the overflow so the scroller can't bleed into the page
-              width. */}
-          {msgs.length <= 2 && (
+          {/* Suggestion chips — surface after the welcome message and
+              again whenever the last assistant reply was "unknown" so
+              an operator who asked something unparseable gets a nudge.
+              Industry-aware: the labels use useTerm() above so a
+              restaurant sees "Checks today", a workshop sees "Work
+              orders today", etc. */}
+          {(msgs.length <= 2 || msgs[msgs.length - 1]?.source === "unknown") && (
             <div className="overflow-hidden border-t border-border bg-muted/20">
               <div className="flex items-center gap-1.5 overflow-x-auto px-3 py-1.5 scrollbar-hide">
                 <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Try
+                  Try asking
                 </span>
-                {SUGGESTIONS.map((s) => {
-                  const Icon = s.Icon
-                  return (
-                    <button
-                      key={s.label}
-                      type="button"
-                      onClick={() => send(s.prompt)}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium hover:border-brand/40 hover:bg-accent"
-                    >
-                      <Icon className="h-3 w-3 text-brand dark:text-primary" />
-                      {s.label}
-                    </button>
-                  )
-                })}
+                {examples.map((s) => (
+                  <button
+                    key={s.label}
+                    type="button"
+                    onClick={() => send(s.prompt)}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium hover:border-brand/40 hover:bg-accent"
+                  >
+                    <Sparkles className="h-3 w-3 text-brand dark:text-primary" />
+                    {s.label}
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -427,4 +488,8 @@ function TypingDots() {
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:240ms]" />
     </span>
   )
+}
+
+function cap(s: string): string {
+  return s.length === 0 ? s : s[0].toUpperCase() + s.slice(1)
 }
