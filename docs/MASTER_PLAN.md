@@ -236,7 +236,26 @@ Routing:
 | **B13** | Customer portal endpoints — `/portal/*` surface, customer auth (OTP), customer-scoped JWT, order history, invoices, credits, ticket creation | 1.5 wks |
 | **B14** | Compliance endpoints — FIRS VAT/WHT export jobs, NDPR data-export & deletion, period-close orchestration, audit-log query API | 1.5 wks |
 
-**Phase C total: ~38 weeks (~9 months solo, ~5 months with 2 devs).**
+**Phase C total: ~38 weeks (~9 months solo, ~5 months with 2 devs) for B1–B14.**
+
+---
+
+## Phase C expansion (added 2026-06-01 after the exhaustive sweep)
+
+The 26-agent sweep surfaced 39 endpoints with no home in B1–B14 plus several structural gaps that warrant their own waves rather than scattered ad-hoc work. Full analysis in `docs/BACKEND_COVERAGE.md`.
+
+| Wave | Title | Size |
+|---|---|---|
+| **B15** | Settings Surfaces & Locations — Locations CRUD (public-facing entity, distinct from internal Warehouses) + 8 settings sub-domains (notifications prefs / invoice template / loyalty rules / barcodes / preferences / export jobs / import / data jobs). All share org-scope CRUD + admin permission. | **2 wks** |
+| **B16** | Real-time Event Bus (WebSocket/SSE) — channel sub layer; fan-out from domain events to KDS prep queue, team chat, activity feed/dashboard KPIs, notification bell, venue spot status, SLA-overdue ticket alerts. Must land BEFORE B5's prep queue UI feels live. | **3 wks** |
+| **B17** | AI Generation, Credits, Assistant — AI ad gen (text/flier/carousel/video jobs), credit metering ledger, Pallio assistant context-scoped chat, AI insights (anomaly / ROAS / margin / vendor-late). Pulls AI work out of scattered B11/B12. | **3 wks** |
+| **B18** | Offline Sync Worker & Conflict Resolution — durable streaming sync protocol (push/pull/cursor/resolve), beyond B4's single-record `POST /v1/pos/sync`. Required before Tauri desktop POS ships. Includes Tauri native bridge for thermal print queue + cash drawer + barcode scanner + biometric attestation + FCM (Rust + Swift + Kotlin layer). | **3 wks** |
+
+**Phase C revised total: ~47 weeks (~12 months solo, ~7 months with 2 devs) for B1–B18.**
+
+**Phase D wiring expands from W1–W14 to W1–W18** to track the four new backend waves (+2 weeks).
+
+**v0.5 MVP cut unchanged:** F0+F1+F2+F3+F4+F6+F7 → S1 → B1–B6 → W1–W5. The new waves slot in after MVP ships.
 
 **MVP cut for v0.5: B1–B6** (auth → catalog → POS → payments → real money flow). **B7 must come second** (the books must be real). B8–B14 are the long tail.
 
